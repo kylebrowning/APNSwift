@@ -14,10 +14,12 @@
 
 import Foundation
 import NIO
+import NIOHTTP1
 import NIOHTTP2
 import NIOSSL
 import NIOTLS
 import Logging
+import AsyncHTTPClient
 
 private final class WaitForTLSUpHandler: ChannelInboundHandler {
     typealias InboundIn = Never
@@ -100,7 +102,18 @@ public final class APNSwiftConnection: APNSwiftClient {
             return eventLoop.makeFailedFuture(error)
         }
         let connectionFullyUpPromise = eventLoop.makePromise(of: Void.self)
-        let tcpConnection = ClientBootstrap(group: eventLoop).connect(host: configuration.url.host!, port: 443)
+        let tcpConnection = ClientBootstrap(group: eventLoop)
+            .channelInitializer({ (channel) -> EventLoopFuture<Void> in
+                let channelAddedFuture: EventLoopFuture<Void>
+                switch configuration.proxy {
+                case .none:
+                    channelAddedFuture = eventLoop.makeSucceededFuture(())
+                case .some:
+                    channelAddedFuture = channel.pipeline.addProxyHandler(host: configuration.url.host!, port: 443, authorization: configuration.proxy?.authorization)
+                }
+                return channelAddedFuture
+            })
+            .connect(host: configuration.proxy?.host ?? configuration.url.host!, port: configuration.proxy?.port ?? 443)
         tcpConnection.cascadeFailure(to: connectionFullyUpPromise)
         return tcpConnection.flatMap { channel in
             let sslHandler: NIOSSLClientHandler
@@ -250,5 +263,144 @@ public final class APNSwiftConnection: APNSwiftClient {
             self.bearerTokenFactory = nil
         }
         return self.channel.close(mode: .all)
+    }
+}
+
+extension ChannelPipeline {
+    func addProxyHandler(host: String, port: Int, authorization: HTTPClient.Authorization?) -> EventLoopFuture<Void> {
+        let encoder = HTTPRequestEncoder()
+        let decoder = ByteToMessageHandler(HTTPResponseDecoder(leftOverBytesStrategy: .forwardBytes))
+        let handler = HTTPClientProxyHandler(host: host, port: port, authorization: authorization) { channel in
+            let encoderRemovePromise = self.eventLoop.next().makePromise(of: Void.self)
+            channel.pipeline.removeHandler(encoder, promise: encoderRemovePromise)
+            return encoderRemovePromise.futureResult.flatMap {
+                channel.pipeline.removeHandler(decoder)
+            }
+        }
+        return addHandlers([encoder, decoder, handler])
+    }
+}
+
+internal final class HTTPClientProxyHandler: ChannelDuplexHandler, RemovableChannelHandler {
+    typealias InboundIn = HTTPClientResponsePart
+    typealias OutboundIn = HTTPClientRequestPart
+    typealias OutboundOut = HTTPClientRequestPart
+
+    enum WriteItem {
+        case write(NIOAny, EventLoopPromise<Void>?)
+        case flush
+    }
+
+    enum ReadState {
+        case awaitingResponse
+        case connecting
+        case connected
+        case failed
+    }
+
+    private let host: String
+    private let port: Int
+    private let authorization: HTTPClient.Authorization?
+    private var onConnect: (Channel) -> EventLoopFuture<Void>
+    private var writeBuffer: CircularBuffer<WriteItem>
+    private var readBuffer: CircularBuffer<NIOAny>
+    private var readState: ReadState
+
+    init(host: String, port: Int, authorization: HTTPClient.Authorization?, onConnect: @escaping (Channel) -> EventLoopFuture<Void>) {
+        self.host = host
+        self.port = port
+        self.authorization = authorization
+        self.onConnect = onConnect
+        self.writeBuffer = .init()
+        self.readBuffer = .init()
+        self.readState = .awaitingResponse
+    }
+
+    func channelRead(context: ChannelHandlerContext, data: NIOAny) {
+        switch self.readState {
+        case .awaitingResponse:
+            let res = self.unwrapInboundIn(data)
+            switch res {
+            case .head(let head):
+                switch head.status.code {
+                case 200..<300:
+                    // Any 2xx (Successful) response indicates that the sender (and all
+                    // inbound proxies) will switch to tunnel mode immediately after the
+                    // blank line that concludes the successful response's header section
+                    break
+                case 407:
+                    self.readState = .failed
+                    context.fireErrorCaught(HTTPClientError.proxyAuthenticationRequired)
+                default:
+                    // Any response other than a successful response
+                    // indicates that the tunnel has not yet been formed and that the
+                    // connection remains governed by HTTP.
+                    context.fireErrorCaught(HTTPClientError.invalidProxyResponse)
+                }
+            case .end:
+                self.readState = .connecting
+                _ = self.handleConnect(context: context)
+            case .body:
+                break
+            }
+        case .connecting:
+            self.readBuffer.append(data)
+        case .connected:
+            context.fireChannelRead(data)
+        case .failed:
+            break
+        }
+    }
+
+    func write(context: ChannelHandlerContext, data: NIOAny, promise: EventLoopPromise<Void>?) {
+        self.writeBuffer.append(.write(data, promise))
+    }
+
+    func flush(context: ChannelHandlerContext) {
+        self.writeBuffer.append(.flush)
+    }
+
+    func channelActive(context: ChannelHandlerContext) {
+        self.sendConnect(context: context)
+        context.fireChannelActive()
+    }
+
+    // MARK: Private
+
+    private func handleConnect(context: ChannelHandlerContext) -> EventLoopFuture<Void> {
+        return self.onConnect(context.channel).flatMap {
+            self.readState = .connected
+
+            // forward any buffered reads
+            while !self.readBuffer.isEmpty {
+                context.fireChannelRead(self.readBuffer.removeFirst())
+            }
+
+            // calls to context.write may be re-entrant
+            while !self.writeBuffer.isEmpty {
+                switch self.writeBuffer.removeFirst() {
+                case .flush:
+                    context.flush()
+                case .write(let data, let promise):
+                    context.write(data, promise: promise)
+                }
+            }
+            return context.pipeline.removeHandler(self)
+        }
+    }
+
+    private func sendConnect(context: ChannelHandlerContext) {
+        var head = HTTPRequestHead(
+            version: .init(major: 1, minor: 1),
+            method: .CONNECT,
+            uri: "\(self.host):\(self.port)"
+        )
+        head.headers.add(name: "proxy-connection", value: "keep-alive")
+        if let authorization = authorization {
+            head.headers.add(name: "proxy-authorization", value: authorization.headerValue)
+        }
+        context.write(self.wrapOutboundOut(.head(head)), promise: nil)
+        context.write(self.wrapOutboundOut(.end(nil)), promise: nil)
+        context.flush()
     }
 }

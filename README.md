@@ -71,6 +71,18 @@ let apnsConfig = try APNSwiftConfiguration(keyIdentifier: "9UC9ZLQ8YW",
                                    environment: .sandbox)
 ```
 
+#### Example `APNSwiftConfiguration` to connect via a proxy server
+
+```swift
+let signer = ...
+let apnsConfig = try APNSwiftConfiguration(keyIdentifier: "9UC9ZLQ8YW",
+                                   teamIdentifier: "ABBM6U9RM5",
+                                   signer: signer),
+                                   topic: "com.grasscove.Fern",
+                                   environment: .sandbox,
+                                                                     proxy: APNSProxy.server(host: "localhost", port : 3128))
+```
+
 ### APNSwiftConnection
 
 [`APNSwiftConnection`](https://github.com/kylebrowning/swift-nio-http2-apns/blob/master/Sources/APNSwift/APNSwiftConnection.swift) is a class with methods thats provides a wrapper to NIO's ClientBootstrap. The `swift-nio-http2` dependency is utilized here. It also provides a function to send a notification to a specific device token string.

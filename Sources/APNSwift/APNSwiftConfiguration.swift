@@ -18,9 +18,12 @@ import NIO
 import NIOHTTP2
 import NIOSSL
 import JWTKit
+import AsyncHTTPClient
 
 /// This is structure that provides the system with common configuration.
 public struct APNSwiftConfiguration {
+    public typealias APNSProxy = HTTPClient.Configuration.Proxy
+    
     public var authenticationMethod: AuthenticationMethod
 
     public enum AuthenticationMethod {
@@ -170,6 +173,8 @@ public struct APNSwiftConfiguration {
     internal var logger: Logger?
     /// Optional timeout time if the connection does not receive a response.
     public var timeout: TimeAmount? = nil
+    /// Upstream proxy, defaults to no proxy.
+    public var proxy: APNSProxy? = nil
 
     public var url: URL {
         switch environment {
@@ -200,7 +205,8 @@ public struct APNSwiftConfiguration {
         topic: String,
         environment: APNSwiftConfiguration.Environment,
         logger: Logger? = nil,
-        timeout: TimeAmount? = nil
+        timeout: TimeAmount? = nil,
+        proxy: APNSProxy? = nil
     ) {
         self.topic = topic
         self.authenticationMethod = authenticationMethod
@@ -210,6 +216,7 @@ public struct APNSwiftConfiguration {
             self.logger = logger
         }
         self.timeout = timeout
+        self.proxy = proxy
     }
 }
 
