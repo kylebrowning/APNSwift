@@ -12,7 +12,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if canImport(FoundationEssentials)
+import struct FoundationEssentials.UUID
+#else
 import struct Foundation.UUID
+#endif
 
 /// Represents a request to the APNs broadcast channel management API.
 public struct APNSBroadcastRequest<Message: Encodable>: Sendable where Message: Sendable {

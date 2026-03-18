@@ -12,8 +12,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if canImport(FoundationEssentials)
+import struct FoundationEssentials.Date
+import struct FoundationEssentials.UUID
+#else
 import struct Foundation.Date
 import struct Foundation.UUID
+#endif
 
 /// An error returned by APNs.
 public struct APNSError: Error {

@@ -15,7 +15,12 @@
 import APNSCore
 import APNS
 import Logging
+import NIOPosix
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
 import Foundation
+#endif
 
 let logger = Logger(label: "APNSwiftExample")
 
