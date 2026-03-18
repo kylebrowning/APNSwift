@@ -16,6 +16,7 @@
 import APNS
 import APNSTestServer
 import Crypto
+import NIOPosix
 import XCTest
 
 final class APNSBroadcastClientTests: XCTestCase {
@@ -39,7 +40,7 @@ final class APNSBroadcastClientTests: XCTestCase {
             ),
             environment: .custom(url: "http://127.0.0.1", port: serverPort),
             bundleID: "com.example.testapp",
-            eventLoopGroupProvider: .createNew,
+            eventLoopGroupProvider: .shared(MultiThreadedEventLoopGroup.singleton),
             responseDecoder: JSONDecoder(),
             requestEncoder: JSONEncoder()
         )
