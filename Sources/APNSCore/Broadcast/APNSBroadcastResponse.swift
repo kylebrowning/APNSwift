@@ -23,11 +23,15 @@ public struct APNSBroadcastResponse<Body: Decodable>: Sendable where Body: Senda
     /// The request ID returned by APNs.
     public let apnsRequestID: UUID?
 
-    /// The response body.
-    public let body: Body
+    /// The channel ID returned by APNs.
+    public let channelID: String?
 
-    public init(apnsRequestID: UUID?, body: Body) {
+    /// The response body.
+    public let body: Body?
+
+    public init(apnsRequestID: UUID?, channelID: String?, body: Body?) {
         self.apnsRequestID = apnsRequestID
+        self.channelID = channelID
         self.body = body
     }
 }

@@ -57,8 +57,7 @@ final class APNSBroadcastClientTests: XCTestCase {
         let response = try await client.create(channel: channel, apnsRequestID: nil)
 
         XCTAssertNotNil(response.apnsRequestID)
-        XCTAssertNotNil(response.body.channelID)
-        XCTAssertEqual(response.body.messageStoragePolicy, .mostRecentMessageStored)
+        XCTAssertNotNil(response.channelID)
     }
 
     func testCreateChannel_noMessageStored() async throws {
@@ -66,22 +65,22 @@ final class APNSBroadcastClientTests: XCTestCase {
         let response = try await client.create(channel: channel, apnsRequestID: nil)
 
         XCTAssertNotNil(response.apnsRequestID)
-        XCTAssertNotNil(response.body.channelID)
-        XCTAssertEqual(response.body.messageStoragePolicy, .noMessageStored)
+        XCTAssertNotNil(response.channelID)
     }
 
     func testReadChannel() async throws {
         // First, create a channel
         let channel = APNSBroadcastChannel(messageStoragePolicy: .mostRecentMessageStored)
         let createResponse = try await client.create(channel: channel, apnsRequestID: nil)
-        let channelID = createResponse.body.channelID!
+        let channelID = createResponse.channelID!
 
         // Now read it back
         let readResponse = try await client.read(channelID: channelID, apnsRequestID: nil)
 
         XCTAssertNotNil(readResponse.apnsRequestID)
-        XCTAssertEqual(readResponse.body.channelID, channelID)
-        XCTAssertEqual(readResponse.body.messageStoragePolicy, .mostRecentMessageStored)
+        XCTAssertEqual(readResponse.channelID, channelID)
+        XCTAssertEqual(readResponse.body?.messageStoragePolicy, .mostRecentMessageStored)
+        XCTAssertEqual(readResponse.body?.pushType, "LiveActivity")
     }
 
     func testReadChannel_notFound() async throws {
@@ -97,7 +96,7 @@ final class APNSBroadcastClientTests: XCTestCase {
         // First, create a channel
         let channel = APNSBroadcastChannel(messageStoragePolicy: .noMessageStored)
         let createResponse = try await client.create(channel: channel, apnsRequestID: nil)
-        let channelID = createResponse.body.channelID!
+        let channelID = createResponse.channelID!
 
         // Delete it
         let deleteResponse = try await client.delete(channelID: channelID, apnsRequestID: nil)
@@ -131,25 +130,27 @@ final class APNSBroadcastClientTests: XCTestCase {
         let response2 = try await client.create(channel: channel2, apnsRequestID: nil)
         let response3 = try await client.create(channel: channel3, apnsRequestID: nil)
 
-        let channelID1 = response1.body.channelID!
-        let channelID2 = response2.body.channelID!
-        let channelID3 = response3.body.channelID!
+        let channelID1 = response1.channelID!
+        let channelID2 = response2.channelID!
+        let channelID3 = response3.channelID!
 
         // List all channels
         let listResponse = try await client.readAllChannelIDs(apnsRequestID: nil)
 
         XCTAssertNotNil(listResponse.apnsRequestID)
-        XCTAssertEqual(listResponse.body.channels.count, 3)
-        XCTAssertTrue(listResponse.body.channels.contains(channelID1))
-        XCTAssertTrue(listResponse.body.channels.contains(channelID2))
-        XCTAssertTrue(listResponse.body.channels.contains(channelID3))
+        let channels = try XCTUnwrap(listResponse.body?.channels)
+        XCTAssertEqual(channels.count, 3)
+        XCTAssertTrue(channels.contains(channelID1))
+        XCTAssertTrue(channels.contains(channelID2))
+        XCTAssertTrue(channels.contains(channelID3))
     }
 
     func testListAllChannels_empty() async throws {
         let listResponse = try await client.readAllChannelIDs(apnsRequestID: nil)
 
         XCTAssertNotNil(listResponse.apnsRequestID)
-        XCTAssertEqual(listResponse.body.channels.count, 0)
+        let channels = try XCTUnwrap(listResponse.body?.channels)
+        XCTAssertEqual(channels.count, 0)
     }
 
     func testRequestID() async throws {

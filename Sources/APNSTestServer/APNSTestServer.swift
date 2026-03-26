@@ -77,10 +77,12 @@ public final class APNSTestServer: @unchecked Sendable {
     struct MockBroadcastChannel: Codable {
         let channelID: String
         let messageStoragePolicy: Int
+        let pushType: String
 
         enum CodingKeys: String, CodingKey {
             case channelID = "channel-id"
             case messageStoragePolicy = "message-storage-policy"
+            case pushType = "push-type"
         }
     }
 
@@ -133,21 +135,24 @@ public final class APNSTestServer: @unchecked Sendable {
         // Parse the URI
         let components = uri.split(separator: "/")
 
-        // Broadcast channel endpoints: /1/apps/{bundleID}/channels[/{channelID}]
-        // Expected format: ["1", "apps", "{bundleID}", "channels"] or ["1", "apps", "{bundleID}", "channels", "{channelID}"]
+        // Broadcast channel endpoints: /1/apps/{bundleID}/channels
+        // Channel ID is passed via apns-channel-id header for read/delete operations
         switch (method, components.count) {
         case (.POST, 4) where components[0] == "1" && components[1] == "apps" && components[3] == "channels":
             return handleCreateChannel(body: body)
 
         case (.GET, 4) where components[0] == "1" && components[1] == "apps" && components[3] == "channels":
+            if let channelID = headers.first(name: "apns-channel-id") {
+                return handleReadChannel(channelID: channelID)
+            }
             return handleListChannels()
 
-        case (.GET, 5) where components[0] == "1" && components[1] == "apps" && components[3] == "channels":
-            let channelID = String(components[4])
-            return handleReadChannel(channelID: channelID)
-
-        case (.DELETE, 5) where components[0] == "1" && components[1] == "apps" && components[3] == "channels":
-            let channelID = String(components[4])
+        case (.DELETE, 4) where components[0] == "1" && components[1] == "apps" && components[3] == "channels":
+            guard let channelID = headers.first(name: "apns-channel-id") else {
+                var responseHeaders = HTTPHeaders()
+                responseHeaders.add(name: "content-type", value: "application/json")
+                return (.badRequest, responseHeaders, "{\"reason\":\"MissingChannelID\"}")
+            }
             return handleDeleteChannel(channelID: channelID)
 
         // Regular push notification endpoint: POST /3/device/{token}
@@ -197,23 +202,20 @@ public final class APNSTestServer: @unchecked Sendable {
 
         let data = Data(bytes)
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let policy = json["message-storage-policy"] as? Int else {
+              let policy = json["message-storage-policy"] as? Int,
+              let pushType = json["push-type"] as? String else {
             var headers = HTTPHeaders()
             headers.add(name: "content-type", value: "application/json")
             return (.badRequest, headers, "{\"reason\":\"BadRequest\"}")
         }
 
         let channelID = UUID().uuidString
-        let channel = MockBroadcastChannel(channelID: channelID, messageStoragePolicy: policy)
+        let channel = MockBroadcastChannel(channelID: channelID, messageStoragePolicy: policy, pushType: pushType)
         broadcastChannels[channelID] = channel
 
         var headers = HTTPHeaders()
-        headers.add(name: "content-type", value: "application/json")
-
-        let responseJSON = """
-        {"channel-id":"\(channelID)","message-storage-policy":\(policy)}
-        """
-        return (.created, headers, responseJSON)
+        headers.add(name: "apns-channel-id", value: channelID)
+        return (.ok, headers, "")
     }
 
     private func handleListChannels() -> (status: HTTPResponseStatus, headers: HTTPHeaders, body: String) {
@@ -235,20 +237,20 @@ public final class APNSTestServer: @unchecked Sendable {
         }
 
         let responseJSON = """
-        {"channel-id":"\(channel.channelID)","message-storage-policy":\(channel.messageStoragePolicy)}
+        {"message-storage-policy":\(channel.messageStoragePolicy),"push-type":"\(channel.pushType)"}
         """
         return (.ok, headers, responseJSON)
     }
 
     private func handleDeleteChannel(channelID: String) -> (status: HTTPResponseStatus, headers: HTTPHeaders, body: String) {
         var headers = HTTPHeaders()
-        headers.add(name: "content-type", value: "application/json")
 
         guard broadcastChannels.removeValue(forKey: channelID) != nil else {
+            headers.add(name: "content-type", value: "application/json")
             return (.notFound, headers, "{\"reason\":\"NotFound\"}")
         }
 
-        return (.ok, headers, "{}")
+        return (.noContent, headers, "")
     }
 
     // MARK: - Push Notification Handler
