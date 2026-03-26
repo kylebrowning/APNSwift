@@ -15,13 +15,9 @@
 /// Represents a broadcast channel configuration.
 public struct APNSBroadcastChannel: Codable, Sendable {
     enum CodingKeys: String, CodingKey {
-        case channelID = "channel-id"
         case messageStoragePolicy = "message-storage-policy"
         case pushType = "push-type"
     }
-
-    /// The unique identifier for the broadcast channel (only present in responses).
-    public let channelID: String?
 
     /// The message storage policy for this channel.
     public let messageStoragePolicy: APNSBroadcastMessageStoragePolicy
@@ -34,14 +30,12 @@ public struct APNSBroadcastChannel: Codable, Sendable {
     ///
     /// - Parameter messageStoragePolicy: The storage policy for messages in this channel.
     public init(messageStoragePolicy: APNSBroadcastMessageStoragePolicy) {
-        self.channelID = nil
         self.messageStoragePolicy = messageStoragePolicy
         self.pushType = "LiveActivity"
     }
 
     /// Internal initializer used for decoding responses that include channel ID.
-    public init(channelID: String?, messageStoragePolicy: APNSBroadcastMessageStoragePolicy, pushType: String = "LiveActivity") {
-        self.channelID = channelID
+    public init(messageStoragePolicy: APNSBroadcastMessageStoragePolicy, pushType: String = "LiveActivity") {
         self.messageStoragePolicy = messageStoragePolicy
         self.pushType = pushType
     }

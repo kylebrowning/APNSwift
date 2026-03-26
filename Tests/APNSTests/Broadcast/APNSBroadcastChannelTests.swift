@@ -44,27 +44,13 @@ final class APNSBroadcastChannelTests: XCTestCase {
 
     func testDecode() throws {
         let jsonString = """
-        {"channel-id":"test-channel-123","message-storage-policy":1,"push-type":"LiveActivity"}
+        {"message-storage-policy":1,"push-type":"LiveActivity"}
         """
         let data = jsonString.data(using: .utf8)!
         let decoder = JSONDecoder()
         let channel = try decoder.decode(APNSBroadcastChannel.self, from: data)
 
-        XCTAssertEqual(channel.channelID, "test-channel-123")
         XCTAssertEqual(channel.messageStoragePolicy, .mostRecentMessageStored)
-        XCTAssertEqual(channel.pushType, "LiveActivity")
-    }
-
-    func testDecode_withoutChannelID() throws {
-        let jsonString = """
-        {"message-storage-policy":0,"push-type":"LiveActivity"}
-        """
-        let data = jsonString.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        let channel = try decoder.decode(APNSBroadcastChannel.self, from: data)
-
-        XCTAssertNil(channel.channelID)
-        XCTAssertEqual(channel.messageStoragePolicy, .noMessageStored)
         XCTAssertEqual(channel.pushType, "LiveActivity")
     }
 }

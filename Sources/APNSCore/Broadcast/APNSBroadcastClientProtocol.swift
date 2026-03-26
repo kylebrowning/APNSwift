@@ -35,7 +35,7 @@ extension APNSBroadcastClientProtocol {
     public func create(
         channel: APNSBroadcastChannel,
         apnsRequestID: UUID? = nil
-    ) async throws -> APNSBroadcastResponse<APNSBroadcastChannel> {
+    ) async throws -> APNSBroadcastResponse<EmptyPayload> {
         let request = APNSBroadcastRequest<APNSBroadcastChannel>(
             operation: .create,
             message: channel,
