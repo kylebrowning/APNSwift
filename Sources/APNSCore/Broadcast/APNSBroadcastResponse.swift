@@ -12,7 +12,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if canImport(FoundationEssentials)
+import struct FoundationEssentials.UUID
+#else
 import struct Foundation.UUID
+#endif
 
 /// Represents a response from a broadcast channel operation.
 public struct APNSBroadcastResponse<Body: Decodable>: Sendable where Body: Sendable {

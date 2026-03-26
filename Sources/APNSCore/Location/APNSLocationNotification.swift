@@ -12,7 +12,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if canImport(FoundationEssentials)
+import struct FoundationEssentials.UUID
+#else
 import struct Foundation.UUID
+#endif
 
 /// A location notification.
 public struct APNSLocationNotification: APNSMessage {

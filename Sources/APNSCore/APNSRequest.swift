@@ -12,7 +12,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if canImport(FoundationEssentials)
+import struct FoundationEssentials.UUID
+#else
 import struct Foundation.UUID
+#endif
 
 public struct APNSRequest<Message: APNSMessage> {
     fileprivate final class _Storage {

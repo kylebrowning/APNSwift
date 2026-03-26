@@ -12,7 +12,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if canImport(FoundationEssentials)
+import struct FoundationEssentials.UUID
+#else
 import struct Foundation.UUID
+#endif
 
 /// Protocol defining the broadcast channel management operations.
 public protocol APNSBroadcastClientProtocol: Sendable {
