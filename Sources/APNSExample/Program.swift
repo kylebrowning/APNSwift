@@ -50,7 +50,7 @@ struct Main {
                 ),
                 environment: .development
             ),
-            eventLoopGroupProvider: .createNew,
+            eventLoopGroupProvider: .shared(MultiThreadedEventLoopGroup.singleton),
             responseDecoder: JSONDecoder(),
             requestEncoder: JSONEncoder()
         )

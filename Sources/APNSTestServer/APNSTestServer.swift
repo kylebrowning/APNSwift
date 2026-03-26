@@ -96,8 +96,12 @@ public final class APNSTestServer: @unchecked Sendable {
             .serverChannelOption(ChannelOptions.backlog, value: 256)
             .serverChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
             .childChannelInitializer { channel in
-                channel.pipeline.configureHTTPServerPipeline().flatMap {
-                    channel.pipeline.addHandler(APNSRequestHandler(server: self))
+                do {
+                    try channel.pipeline.syncOperations.configureHTTPServerPipeline()
+                    try channel.pipeline.syncOperations.addHandler(APNSRequestHandler(server: self))
+                    return channel.eventLoop.makeSucceededVoidFuture()
+                } catch {
+                    return channel.eventLoop.makeFailedFuture(error)
                 }
             }
 
