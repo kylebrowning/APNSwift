@@ -12,7 +12,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if canImport(FoundationEssentials)
+import struct FoundationEssentials.UUID
+#else
 import struct Foundation.UUID
+#endif
 
 /// A Push to Talk (PTT) notification.
 public struct APNSPushToTalkNotification<Payload: Encodable & Sendable>: APNSMessage {

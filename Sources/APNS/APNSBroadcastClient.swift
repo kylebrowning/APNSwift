@@ -14,8 +14,13 @@
 
 import APNSCore
 import AsyncHTTPClient
+#if canImport(FoundationEssentials)
+import struct FoundationEssentials.Date
+import struct FoundationEssentials.UUID
+#else
 import struct Foundation.Date
 import struct Foundation.UUID
+#endif
 import NIOConcurrencyHelpers
 import NIOCore
 import NIOHTTP1

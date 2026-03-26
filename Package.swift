@@ -40,6 +40,8 @@ let package = Package(
                 .target(name: "APNSCore"),
                 .target(name: "APNS"),
                 .target(name: "APNSTestServer"),
+                .product(name: "Crypto", package: "swift-crypto"),
+                .product(name: "NIOPosix", package: "swift-nio"),
             ]
         ),
         .target(
@@ -51,9 +53,14 @@ let package = Package(
         .target(
             name: "APNS",
             dependencies: [
-                .product(name: "Crypto", package: "swift-crypto"),
-                .product(name: "AsyncHTTPClient", package: "async-http-client"),
                 .target(name: "APNSCore"),
+                .product(name: "AsyncHTTPClient", package: "async-http-client"),
+                .product(name: "Crypto", package: "swift-crypto"),
+                .product(name: "NIOFoundationCompat", package: "swift-nio"),
+                .product(name: "NIOHTTP1", package: "swift-nio"),
+                .product(name: "NIOPosix", package: "swift-nio"),
+                .product(name: "NIOTLS", package: "swift-nio"),
+                .product(name: "NIOSSL", package: "swift-nio-ssl"),
             ]
         ),
         .target(
