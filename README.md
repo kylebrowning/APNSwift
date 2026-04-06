@@ -1,8 +1,8 @@
 [![sswg:graduated|94x20](https://img.shields.io/badge/sswg-graduated-green.svg)]([https://github.com/swift-server/sswg/blob/master/process/incubation.md#sandbox-level](https://www.swift.org/sswg/incubation-process.html#graduation-requirements))
 [![Build](https://github.com/kylebrowning/APNSwift/workflows/test/badge.svg)](https://github.com/kylebrowning/APNSwift/actions)
 [![Documentation](https://img.shields.io/badge/documentation-blueviolet.svg)](https://swiftpackageindex.com/swift-server-community/APNSwift/documentation)
-[![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fswift-server-community%2FAPNSwift%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/swift-server-community/APNSwift)
-[![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fswift-server-community%2FAPNSwift%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/swift-server-community/APNSwift)
+[![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fkylebrowning%2FAPNSwift%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/kylebrowning/APNSwift)<br>
+[![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fkylebrowning%2FAPNSwift%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/kylebrowning/APNSwift)
 <h1> APNSwift</h1>
 
 A non-blocking Swift module for sending remote Apple Push Notification requests to [APNS](https://developer.apple.com/documentation/usernotifications/setting_up_a_remote_notification_server) built on AsyncHttpClient.
