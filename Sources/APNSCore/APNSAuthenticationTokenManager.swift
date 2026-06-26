@@ -70,7 +70,7 @@ public final actor APNSAuthenticationTokenManager<Clock: _Concurrency.Clock> whe
             /// First we check if there is a previously generated token
             /// and if that token is still valid.
             if let lastGeneratedToken = lastGeneratedToken,
-               lastGeneratedToken.issuedAt.duration(to: self.clock.now) < .seconds(60 * 55) {
+               lastGeneratedToken.issuedAt.duration(to: self.clock.now) < self.expirationDurationInSeconds {
                 /// The last generated token is still valid
                 return lastGeneratedToken.token
             } else {
