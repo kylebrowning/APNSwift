@@ -28,15 +28,13 @@ public struct APNSBroadcastChannel: Codable, Sendable {
 
     /// Creates a new broadcast channel configuration.
     ///
+    /// `pushType` is fixed to `"LiveActivity"`, the only value APNs currently supports for
+    /// broadcast channels. When decoding a channel from an APNs response, `pushType` is read
+    /// from the payload via the synthesized `Codable` conformance.
+    ///
     /// - Parameter messageStoragePolicy: The storage policy for messages in this channel.
     public init(messageStoragePolicy: APNSBroadcastMessageStoragePolicy) {
         self.messageStoragePolicy = messageStoragePolicy
         self.pushType = "LiveActivity"
-    }
-
-    /// Internal initializer used for decoding responses that include channel ID.
-    public init(messageStoragePolicy: APNSBroadcastMessageStoragePolicy, pushType: String = "LiveActivity") {
-        self.messageStoragePolicy = messageStoragePolicy
-        self.pushType = pushType
     }
 }

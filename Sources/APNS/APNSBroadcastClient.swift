@@ -184,7 +184,12 @@ extension APNSBroadcastClient {
         // Handle successful responses
         if response.status == .ok || response.status == .created || response.status == .noContent {
             let body = try await response.body.collect(upTo: 1024 * 1024) // 1MB max
-            let responseBody = try? responseDecoder.decode(ResponseBody.self, from: body)
+            // Operations like create/delete return an empty body, so only decode when there
+            // are bytes to decode — and when there are, surface decode failures rather than
+            // silently dropping a malformed body to `nil`.
+            let responseBody = body.readableBytes > 0
+                ? try responseDecoder.decode(ResponseBody.self, from: body)
+                : nil
             return APNSBroadcastResponse(apnsRequestID: apnsRequestID, channelID: channelID, body: responseBody)
         }
 
