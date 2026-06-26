@@ -153,6 +153,17 @@ final class APNSBroadcastClientTests: XCTestCase {
         XCTAssertEqual(channels.count, 0)
     }
 
+    // MARK: - Operation path contract
+
+    func testOperationPaths() {
+        // Individual channel operations target `/channels`...
+        XCTAssertEqual(APNSBroadcastRequest<EmptyPayload>(operation: .create).operation.path, "/channels")
+        XCTAssertEqual(APNSBroadcastRequest<EmptyPayload>(operation: .read(channelID: "x")).operation.path, "/channels")
+        XCTAssertEqual(APNSBroadcastRequest<EmptyPayload>(operation: .delete(channelID: "x")).operation.path, "/channels")
+        // ...while "read all channels" lives on Apple's distinct `/all-channels` endpoint.
+        XCTAssertEqual(APNSBroadcastRequest<EmptyPayload>(operation: .listAll).operation.path, "/all-channels")
+    }
+
     func testRequestID() async throws {
         let requestID = UUID()
         let channel = APNSBroadcastChannel(messageStoragePolicy: .mostRecentMessageStored)

@@ -46,8 +46,12 @@ public struct APNSBroadcastRequest<Message: Encodable>: Sendable where Message: 
         /// The path for this operation.
         public var path: String {
             switch self {
-            case .create, .delete, .read, .listAll:
+            case .create, .delete, .read:
                 return "/channels"
+            case .listAll:
+                // Apple exposes "read all channels" on a distinct endpoint.
+                // See: https://developer.apple.com/documentation/usernotifications/sending-channel-management-requests-to-apns
+                return "/all-channels"
             }
         }
 
