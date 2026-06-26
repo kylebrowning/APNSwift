@@ -86,6 +86,12 @@ public final class APNSTestServer: @unchecked Sendable {
         }
     }
 
+    /// A valid-hex device token that the server treats as unregistered, responding with `410 Unregistered`.
+    public static let unregisteredDeviceToken = String(repeating: "f", count: 64)
+
+    /// The `timestamp` (milliseconds since epoch) returned alongside a simulated `410 Unregistered` response.
+    public static let unregisteredTimestampMilliseconds = 1_454_096_879_000
+
     public init() {
         self.group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
     }
@@ -266,6 +272,15 @@ public final class APNSTestServer: @unchecked Sendable {
             var responseHeaders = HTTPHeaders()
             responseHeaders.add(name: "content-type", value: "application/json")
             return (.badRequest, responseHeaders, "{\"reason\":\"BadDeviceToken\"}")
+        }
+
+        // Simulate an unregistered token: a valid-hex token equal to `Self.unregisteredDeviceToken`
+        // responds with `410 Unregistered` and a `timestamp`, mirroring Apple's behaviour so the
+        // `APNSError.timestamp` decoding path can be exercised.
+        if deviceToken == Self.unregisteredDeviceToken {
+            var responseHeaders = HTTPHeaders()
+            responseHeaders.add(name: "content-type", value: "application/json")
+            return (.gone, responseHeaders, "{\"reason\":\"Unregistered\",\"timestamp\":\(Self.unregisteredTimestampMilliseconds)}")
         }
 
         // Validate required topic header
