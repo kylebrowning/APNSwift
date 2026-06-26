@@ -98,13 +98,57 @@ final class APNSAuthenticationTokenManagerTests: XCTestCase {
 
     func testTokenIsRefreshed() async throws {
         let token1 = try await tokenManager.nextValidToken
-        
+
         // 56 minutes later
         let temp = clock.now.advanced(by: .init(secondsComponent: 3360, attosecondsComponent: 0))
         clock.now = temp
         let token2 = try await tokenManager.nextValidToken
 
         XCTAssertNotEqual(token1, token2)
+    }
+
+    /// The refresh window is `[0, 55min)`: a token is still considered valid one
+    /// second before 55 minutes, and refreshed at exactly 55 minutes.
+    func testTokenReusedJustBeforeBoundaryAndRefreshedAtBoundary() async throws {
+        let token1 = try await tokenManager.nextValidToken
+
+        // 54:59 — still inside the window, so the cached token is returned.
+        clock.now = clock.now.advanced(by: .init(secondsComponent: 3299, attosecondsComponent: 0))
+        let reused = try await tokenManager.nextValidToken
+        XCTAssertEqual(token1, reused)
+
+        // 55:00 — `duration(to:)` is no longer `< 55min`, so a fresh token is generated.
+        clock.now = clock.now.advanced(by: .init(secondsComponent: 1, attosecondsComponent: 0))
+        let refreshed = try await tokenManager.nextValidToken
+        XCTAssertNotEqual(token1, refreshed)
+    }
+
+    /// A refreshed token must be a well-formed JWT with the correct claims — not merely
+    /// a different string (ECDSA signatures are randomized, so string inequality alone is weak).
+    func testRefreshedTokenIsStructurallyValid() async throws {
+        _ = try await tokenManager.nextValidToken
+
+        clock.now = clock.now.advanced(by: .init(secondsComponent: 3360, attosecondsComponent: 0))
+        let refreshed = try await tokenManager.nextValidToken
+
+        let segments = try XCTUnwrap(refreshed.split(separator: " ").last).split(separator: ".")
+        XCTAssertEqual(segments.count, 3, "Expected a `header.payload.signature` JWT")
+
+        let header = try decodeSegment(segments[0])
+        XCTAssertTrue(header.contains("\"kid\": \"bar\""))
+        XCTAssertTrue(header.contains("\"alg\": \"ES256\""))
+
+        let payload = try decodeSegment(segments[1])
+        XCTAssertTrue(payload.contains("\"iss\": \"foo\""))
+        XCTAssertTrue(payload.contains("\"kid\": \"bar\""))
+    }
+
+    private func decodeSegment(_ segment: Substring) throws -> String {
+        let bytes = try Base64.decode(
+            string: String(segment),
+            options: [.base64UrlAlphabet, .omitPaddingCharacter]
+        )
+        return try XCTUnwrap(String(bytes: bytes, encoding: .utf8))
     }
 }
 
