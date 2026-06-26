@@ -39,6 +39,7 @@ let package = Package(
             dependencies: [
                 .target(name: "APNSCore"),
                 .target(name: "APNS"),
+                .target(name: "APNSURLSession"),
                 .target(name: "APNSTestServer"),
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "NIOPosix", package: "swift-nio"),
