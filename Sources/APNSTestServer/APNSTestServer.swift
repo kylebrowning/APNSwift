@@ -25,7 +25,7 @@ import struct Foundation.CharacterSet
 ///
 /// This server supports both:
 /// - **Regular push notifications**: `POST /3/device/{token}`
-/// - **Broadcast channels**: `POST/GET/DELETE /channels[/{id}]`
+/// - **Broadcast channels**: `POST/GET/DELETE /1/apps/{bundleID}/channels` (+ `GET /1/apps/{bundleID}/all-channels`)
 ///
 /// ## Usage
 ///
@@ -141,11 +141,19 @@ public final class APNSTestServer: @unchecked Sendable {
         case (.POST, 4) where components[0] == "1" && components[1] == "apps" && components[3] == "channels":
             return handleCreateChannel(body: body)
 
-        case (.GET, 4) where components[0] == "1" && components[1] == "apps" && components[3] == "channels":
-            if let channelID = headers.first(name: "apns-channel-id") {
-                return handleReadChannel(channelID: channelID)
-            }
+        case (.GET, 4) where components[0] == "1" && components[1] == "apps" && components[3] == "all-channels":
             return handleListChannels()
+
+        case (.GET, 4) where components[0] == "1" && components[1] == "apps" && components[3] == "channels":
+            // Reading a single channel requires the channel ID header. Unlike the real
+            // APNs API, `GET .../channels` without an ID is NOT the list endpoint
+            // (that lives at `.../all-channels`), so reject it rather than silently listing.
+            guard let channelID = headers.first(name: "apns-channel-id") else {
+                var responseHeaders = HTTPHeaders()
+                responseHeaders.add(name: "content-type", value: "application/json")
+                return (.badRequest, responseHeaders, "{\"reason\":\"MissingChannelID\"}")
+            }
+            return handleReadChannel(channelID: channelID)
 
         case (.DELETE, 4) where components[0] == "1" && components[1] == "apps" && components[3] == "channels":
             guard let channelID = headers.first(name: "apns-channel-id") else {
