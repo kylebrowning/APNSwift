@@ -97,6 +97,11 @@ public struct APNSVoIPNotification<Payload: Encodable & Sendable>: APNSMessage {
         self.payload = payload
         self.apnsID = apnsID
     }
+
+    @inlinable
+    public func encode(to encoder: Encoder) throws {
+        try self.payload.encode(to: encoder)
+    }
 }
 
 extension APNSVoIPNotification where Payload == EmptyPayload {
