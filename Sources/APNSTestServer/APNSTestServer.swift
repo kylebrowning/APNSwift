@@ -75,6 +75,7 @@ public final class APNSTestServer: @unchecked Sendable {
         public let collapseID: String?
         public let apnsID: UUID
         public let payload: Data
+        public let authorization: String?
 
         public func decodedPayload<T: Decodable>(as type: T.Type) throws -> T {
             try JSONDecoder().decode(type, from: payload)
@@ -783,6 +784,7 @@ public final class APNSTestServer: @unchecked Sendable {
         let priority = headers.first(name: "apns-priority")
         let expiration = headers.first(name: "apns-expiration")
         let collapseID = headers.first(name: "apns-collapse-id")
+        let authorization = headers.first(name: "authorization")
 
         // Store the notification
         let notification = SentNotification(
@@ -793,7 +795,8 @@ public final class APNSTestServer: @unchecked Sendable {
             expiration: expiration,
             collapseID: collapseID,
             apnsID: apnsID,
-            payload: payload
+            payload: payload,
+            authorization: authorization
         )
         sentNotificationsBox.withLockedValue { $0.append(notification) }
 
