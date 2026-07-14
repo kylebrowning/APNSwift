@@ -88,7 +88,8 @@ final class APNSBroadcastClientTests: XCTestCase {
             _ = try await client.read(channelID: "non-existent-channel", apnsRequestID: nil)
             XCTFail("Expected error to be thrown")
         } catch let error as APNSError {
-            XCTAssertEqual(error.responseStatus, 404)
+            XCTAssertEqual(error.responseStatus, 400)
+            XCTAssertEqual(error.reason, .channelNotRegistered)
         }
     }
 
@@ -107,7 +108,8 @@ final class APNSBroadcastClientTests: XCTestCase {
             _ = try await client.read(channelID: channelID, apnsRequestID: nil)
             XCTFail("Expected error to be thrown")
         } catch let error as APNSError {
-            XCTAssertEqual(error.responseStatus, 404)
+            XCTAssertEqual(error.responseStatus, 400)
+            XCTAssertEqual(error.reason, .channelNotRegistered)
         }
     }
 
@@ -116,7 +118,8 @@ final class APNSBroadcastClientTests: XCTestCase {
             _ = try await client.delete(channelID: "non-existent-channel", apnsRequestID: nil)
             XCTFail("Expected error to be thrown")
         } catch let error as APNSError {
-            XCTAssertEqual(error.responseStatus, 404)
+            XCTAssertEqual(error.responseStatus, 400)
+            XCTAssertEqual(error.reason, .channelNotRegistered)
         }
     }
 

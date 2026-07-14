@@ -187,15 +187,18 @@ extension APNSClient {
             return APNSResponse(apnsID: apnsID, apnsUniqueID: apnsUniqueID)
         }
 
-        let body = try await response.body.collect(upTo: 1024)
-        let errorResponse = try responseDecoder.decode(APNSErrorResponse.self, from: body)
+        // An empty body, non-JSON body, or a body exceeding the collection limit must still
+        // surface as a typed `APNSError` (with `reason: nil`) rather than a raw decoding error,
+        // so the caller never loses the status code and headers.
+        let body = try? await response.body.collect(upTo: 1024)
+        let errorResponse = body.flatMap { try? responseDecoder.decode(APNSErrorResponse.self, from: $0) }
 
         let error = APNSError(
             responseStatus: Int(response.status.code),
             apnsID: apnsID,
             apnsUniqueID: apnsUniqueID,
             apnsResponse: errorResponse,
-            timestamp: errorResponse.timestampInSeconds.flatMap { Date(timeIntervalSince1970: $0) }
+            timestamp: errorResponse?.timestampInSeconds.flatMap { Date(timeIntervalSince1970: $0) }
         )
 
         throw error

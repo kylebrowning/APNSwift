@@ -63,6 +63,15 @@ public struct APNSError: Error {
             case serviceUnavailable
             case shutdown
             case badEnvironmentKeyInToken
+            case featureNotEnabled
+            case missingChannelId
+            case badChannelId
+            case channelNotRegistered
+            case badRequestParams
+            case badRequestPayload
+            case missingPushType
+            case cannotCreateChannelConfig
+            case topicMismatch
             case unknown(String)
             
             public init(rawValue: RawValue) {
@@ -133,6 +142,24 @@ public struct APNSError: Error {
                     self = .shutdown
                 case "BadEnvironmentKeyInToken":
                     self = .badEnvironmentKeyInToken
+                case "FeatureNotEnabled":
+                    self = .featureNotEnabled
+                case "MissingChannelId":
+                    self = .missingChannelId
+                case "BadChannelId":
+                    self = .badChannelId
+                case "ChannelNotRegistered":
+                    self = .channelNotRegistered
+                case "BadRequestParams":
+                    self = .badRequestParams
+                case "BadRequestPayload":
+                    self = .badRequestPayload
+                case "MissingPushType":
+                    self = .missingPushType
+                case "CannotCreateChannelConfig":
+                    self = .cannotCreateChannelConfig
+                case "TopicMismatch":
+                    self = .topicMismatch
                 default:
                     self = .unknown(rawValue)
                 }
@@ -206,6 +233,24 @@ public struct APNSError: Error {
                     return "Shutdown"
                 case .badEnvironmentKeyInToken:
                     return "BadEnvironmentKeyInToken"
+                case .featureNotEnabled:
+                    return "FeatureNotEnabled"
+                case .missingChannelId:
+                    return "MissingChannelId"
+                case .badChannelId:
+                    return "BadChannelId"
+                case .channelNotRegistered:
+                    return "ChannelNotRegistered"
+                case .badRequestParams:
+                    return "BadRequestParams"
+                case .badRequestPayload:
+                    return "BadRequestPayload"
+                case .missingPushType:
+                    return "MissingPushType"
+                case .cannotCreateChannelConfig:
+                    return "CannotCreateChannelConfig"
+                case .topicMismatch:
+                    return "TopicMismatch"
                 case .unknown(let string):
                     return string
                 }
@@ -279,6 +324,24 @@ public struct APNSError: Error {
                     return "The server is shutting down"
                 case .badEnvironmentKeyInToken:
                     return "Environment mismatch between key and APNs endpoint"
+                case .featureNotEnabled:
+                    return "The broadcast push feature isn't enabled for this topic"
+                case .missingChannelId:
+                    return "The request didn't include the apns-channel-id header"
+                case .badChannelId:
+                    return "The channel ID wasn't properly encoded or exceeds the maximum allowed length"
+                case .channelNotRegistered:
+                    return "The specified channel ID doesn't exist or is no longer registered"
+                case .badRequestParams:
+                    return "The request contains an unrecognizable attribute in the JSON payload"
+                case .badRequestPayload:
+                    return "The request payload couldn't be parsed as JSON"
+                case .missingPushType:
+                    return "The request didn't specify an apns-push-type"
+                case .cannotCreateChannelConfig:
+                    return "The maximum number of channels has been reached; a new channel configuration can't be created"
+                case .topicMismatch:
+                    return "The bundle IDs in the provider token or certificate don't include the specified topic"
                 case .unknown(let string):
                     return "Indicates an error reason that is unknown value \"\(string)\" to `APNSwift`. If you receive this please file an issue so that we can extend the known error reasons"
                 }
@@ -425,8 +488,45 @@ public struct APNSError: Error {
             return .init(_reason: .shutdown)
         }
 
+        @available(*, deprecated, message: "Not a documented APNs error reason; see badEnvironmentKeyIdInToken.")
         public static var badEnvironmentKeyInToken: Self {
             return .init(_reason: .badEnvironmentKeyInToken)
+        }
+
+        public static var featureNotEnabled: Self {
+            return .init(_reason: .featureNotEnabled)
+        }
+
+        public static var missingChannelId: Self {
+            return .init(_reason: .missingChannelId)
+        }
+
+        public static var badChannelId: Self {
+            return .init(_reason: .badChannelId)
+        }
+
+        public static var channelNotRegistered: Self {
+            return .init(_reason: .channelNotRegistered)
+        }
+
+        public static var badRequestParams: Self {
+            return .init(_reason: .badRequestParams)
+        }
+
+        public static var badRequestPayload: Self {
+            return .init(_reason: .badRequestPayload)
+        }
+
+        public static var missingPushType: Self {
+            return .init(_reason: .missingPushType)
+        }
+
+        public static var cannotCreateChannelConfig: Self {
+            return .init(_reason: .cannotCreateChannelConfig)
+        }
+
+        public static var topicMismatch: Self {
+            return .init(_reason: .topicMismatch)
         }
 
         init(_reason: APNSError.ErrorReason.Reason) {
@@ -446,14 +546,15 @@ public struct APNSError: Error {
     /// A unique ID for the notification used for development, as determined by the APNs servers.
     ///
     /// In the development or sandbox environement, this value can be used to look up information about notifications on the [Push Notifications Console](https://icloud.developer.apple.com/dashboard/notifications). This value is not provided in the production environement.
-    public var apnsUniqueID: UUID?
+    public let apnsUniqueID: UUID?
 
     /// The error code indicating the reason for the failure.
     public let reason: ErrorReason?
 
     /// The date at which APNs confirmed the token was no longer valid for the topic.
     ///
-    /// This is only set when the error reason is `unregistered`.
+    /// This accompanies any `410` response status (both the `expiredToken` and `unregistered` reasons),
+    /// not only `unregistered`.
     public let timestamp: Date?
     
     public init(
