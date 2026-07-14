@@ -50,6 +50,8 @@ final class APNSClientIntegrationTests: XCTestCase {
     override func tearDown() async throws {
         try await client?.shutdown()
         try await server?.shutdown()
+        client = nil
+        server = nil
         try await super.tearDown()
     }
 
@@ -108,6 +110,10 @@ final class APNSClientIntegrationTests: XCTestCase {
         XCTAssertEqual(sent.count, 1)
         XCTAssertEqual(sent[0].deviceToken, "1111111111111111111111111111111111111111111111111111111111111111")
         XCTAssertEqual(sent[0].pushType, "alert")
+
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: sent[0].payload) as? NSDictionary)
+        let aps = try XCTUnwrap(json["aps"] as? NSDictionary)
+        XCTAssertEqual(aps["badge"] as? Int, 5)
     }
 
     func testSendAlertNotification_withSound() async throws {
@@ -128,6 +134,10 @@ final class APNSClientIntegrationTests: XCTestCase {
         let sent = server.getSentNotifications()
         XCTAssertEqual(sent.count, 1)
         XCTAssertEqual(sent[0].deviceToken, "2222222222222222222222222222222222222222222222222222222222222222")
+
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: sent[0].payload) as? NSDictionary)
+        let aps = try XCTUnwrap(json["aps"] as? NSDictionary)
+        XCTAssertEqual(aps["sound"] as? String, "default")
     }
 
     // MARK: - Background Notifications
@@ -222,11 +232,177 @@ final class APNSClientIntegrationTests: XCTestCase {
         XCTAssertEqual(sent[0].pushType, "complication")
     }
 
+    // MARK: - Live Activity Notifications
+
+    func testSendLiveActivityNotification() async throws {
+        struct ContentState: Codable {
+            let value: String
+        }
+
+        let notification = APNSLiveActivityNotification(
+            expiration: .immediately,
+            priority: .immediately,
+            appID: "com.example.app",
+            contentState: ContentState(value: "update-value"),
+            event: .update,
+            timestamp: 1_234_567_890
+        )
+
+        _ = try await client.sendLiveActivityNotification(
+            notification,
+            deviceToken: "7777777777777777777777777777777777777777777777777777777777777777"
+        )
+
+        let sent = try XCTUnwrap(server.getSentNotifications().first)
+        XCTAssertEqual(sent.pushType, "liveactivity")
+        XCTAssertEqual(sent.topic, "com.example.app.push-type.liveactivity")
+
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: sent.payload) as? NSDictionary)
+        let aps = try XCTUnwrap(json["aps"] as? NSDictionary)
+        XCTAssertEqual(aps["event"] as? String, "update")
+        XCTAssertNotNil(aps["timestamp"])
+        XCTAssertNotNil(aps["content-state"])
+    }
+
+    func testSendStartLiveActivityNotification() async throws {
+        struct Attributes: Codable {}
+        struct ContentState: Codable {
+            let value: String
+        }
+
+        let notification = APNSStartLiveActivityNotification(
+            expiration: .immediately,
+            priority: .immediately,
+            appID: "com.example.app",
+            contentState: ContentState(value: "start-value"),
+            timestamp: 1_234_567_890,
+            attributes: Attributes(),
+            attributesType: "MyActivityAttributes",
+            alert: .init(title: .raw("Live Activity Started"))
+        )
+
+        _ = try await client.sendStartLiveActivityNotification(
+            notification,
+            pushToStartToken: "8888888888888888888888888888888888888888888888888888888888888888"
+        )
+
+        let sent = try XCTUnwrap(server.getSentNotifications().first)
+        XCTAssertEqual(sent.pushType, "liveactivity")
+        XCTAssertEqual(sent.topic, "com.example.app.push-type.liveactivity")
+
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: sent.payload) as? NSDictionary)
+        let aps = try XCTUnwrap(json["aps"] as? NSDictionary)
+        XCTAssertEqual(aps["event"] as? String, "start")
+        XCTAssertEqual(aps["attributes-type"] as? String, "MyActivityAttributes")
+    }
+
+    // MARK: - Push To Talk Notifications
+
+    func testSendPushToTalkNotification() async throws {
+        struct Payload: Encodable {
+            let activeSpeaker = "Alice"
+        }
+
+        let notification = APNSPushToTalkNotification(
+            appID: "com.example.app",
+            payload: Payload()
+        )
+
+        _ = try await client.sendPushToTalkNotification(
+            notification,
+            deviceToken: "9999999999999999999999999999999999999999999999999999999999999999"
+        )
+
+        let sent = try XCTUnwrap(server.getSentNotifications().first)
+        XCTAssertEqual(sent.pushType, "pushtotalk")
+        XCTAssertEqual(sent.topic, "com.example.app.voip-ptt")
+        XCTAssertEqual(sent.deviceToken, "9999999999999999999999999999999999999999999999999999999999999999")
+        // payload shape asserted in encode tests (see PR1)
+    }
+
+    // MARK: - Widgets Notifications
+
+    func testSendWidgetsNotification() async throws {
+        let notification = APNSWidgetsNotification(appID: "com.example.app")
+
+        _ = try await client.sendWidgetsNotification(
+            notification: notification,
+            deviceToken: "aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111"
+        )
+
+        let sent = try XCTUnwrap(server.getSentNotifications().first)
+        XCTAssertEqual(sent.pushType, "widgets")
+        XCTAssertEqual(sent.topic, "com.example.app.push-type.widgets")
+
+        let expectedJSONString = """
+        {"aps":{"content-changed":true}}
+        """
+        let jsonObject1 = try JSONSerialization.jsonObject(with: sent.payload) as! NSDictionary
+        let jsonObject2 = try JSONSerialization.jsonObject(with: expectedJSONString.data(using: .utf8)!) as! NSDictionary
+        XCTAssertEqual(jsonObject1, jsonObject2)
+    }
+
+    // MARK: - Location Notifications
+
+    func testSendLocationNotification() async throws {
+        let notification = APNSLocationNotification(
+            priority: .immediately,
+            appID: "com.example.app"
+        )
+
+        _ = try await client.sendLocationNotification(
+            notification,
+            deviceToken: "bbbb2222bbbb2222bbbb2222bbbb2222bbbb2222bbbb2222bbbb2222bbbb2222"
+        )
+
+        let sent = try XCTUnwrap(server.getSentNotifications().first)
+        XCTAssertEqual(sent.pushType, "location")
+        XCTAssertEqual(sent.topic, "com.example.app.location-query")
+        // sendLocationNotification forces expiration to `.none`, so no header should be sent.
+        XCTAssertNil(sent.expiration)
+    }
+
+    // MARK: - Alert Notification Header Variants
+
+    func testSendAlert_consideringDevicePower() async throws {
+        let notification = APNSAlertNotification(
+            alert: .init(title: .raw("Power Test")),
+            expiration: .immediately,
+            priority: .consideringDevicePower,
+            topic: "com.example.app",
+            payload: EmptyPayload()
+        )
+
+        _ = try await client.sendAlertNotification(
+            notification,
+            deviceToken: "cccc3333cccc3333cccc3333cccc3333cccc3333cccc3333cccc3333cccc3333"
+        )
+
+        let sent = try XCTUnwrap(server.getSentNotifications().first)
+        XCTAssertEqual(sent.priority, "5")
+    }
+
+    func testSendAlert_noExpirationHeaderWhenNone() async throws {
+        let notification = APNSAlertNotification(
+            alert: .init(title: .raw("Expiration None Test")),
+            expiration: .none,
+            priority: .immediately,
+            topic: "com.example.app",
+            payload: EmptyPayload()
+        )
+
+        _ = try await client.sendAlertNotification(
+            notification,
+            deviceToken: "dddd4444dddd4444dddd4444dddd4444dddd4444dddd4444dddd4444dddd4444"
+        )
+
+        let sent = try XCTUnwrap(server.getSentNotifications().first)
+        XCTAssertNil(sent.expiration)
+    }
+
     // MARK: - Multiple Notifications
 
     func testSendMultipleNotifications() async throws {
-        server.clearSentNotifications()
-
         // Send 3 different notifications
         let alert = APNSAlertNotification(
             alert: .init(title: .raw("Alert")),
