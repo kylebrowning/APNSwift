@@ -21,12 +21,9 @@ import struct FoundationEssentials.UUID
 import struct Foundation.Date
 import struct Foundation.UUID
 #endif
-import NIOConcurrencyHelpers
 import NIOCore
 import NIOHTTP1
 import NIOSSL
-import NIOTLS
-import NIOPosix
 
 /// A client to talk with the Apple Push Notification services.
 public final class APNSClient<Decoder: APNSJSONDecoder, Encoder: APNSJSONEncoder>: APNSClientProtocol {

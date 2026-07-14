@@ -69,7 +69,7 @@ public struct APNSComplicationNotification<Payload: Encodable & Sendable>: APNSM
         )
     }
 
-    /// Initializes a new ``APNSVoIPNotification``.
+    /// Initializes a new ``APNSComplicationNotification``.
     ///
     /// - Important: Your dynamic payload will get encoded to the root of the JSON payload that is send to APNs.
     /// It is **important** that you do not encode anything with the key `aps`

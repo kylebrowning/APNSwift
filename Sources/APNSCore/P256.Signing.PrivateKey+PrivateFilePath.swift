@@ -15,6 +15,7 @@
 import Crypto
 
 extension P256.Signing.PrivateKey {
+    @available(*, deprecated, message: "Use P256.Signing.PrivateKey(pemRepresentation:) instead.")
     public static func loadFrom(string: String) throws -> P256.Signing.PrivateKey {
         try .init(pemRepresentation: string)
     }

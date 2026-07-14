@@ -16,9 +16,9 @@ import APNSCore
 @preconcurrency import Crypto
 
 /// The configuration of an ``APNSURLSessionClient``.
-public struct APNSURLSessionClientConfiguration {
+public struct APNSURLSessionClientConfiguration: Sendable {
     /// The authentication method used by the ``APNSURLSessionClient``.
-    public enum AuthenticationMethod {
+    public enum AuthenticationMethod: Sendable {
         case jwt(privateKey: P256.Signing.PrivateKey, teamIdentifier: String, keyIdentifier: String)
     }
 
