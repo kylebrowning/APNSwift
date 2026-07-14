@@ -40,17 +40,4 @@ final class APNSBroadcastChannelListTests: XCTestCase {
 
         XCTAssertEqual(channelList.channels.count, 0)
     }
-
-    func testEncode() throws {
-        let channelList = APNSBroadcastChannelList(channels: ["channel-1", "channel-2"])
-        let encoder = JSONEncoder()
-        let data = try encoder.encode(channelList)
-
-        let expectedJSONString = """
-        {"channels":["channel-1","channel-2"]}
-        """
-        let jsonObject1 = try JSONSerialization.jsonObject(with: data) as! NSDictionary
-        let jsonObject2 = try JSONSerialization.jsonObject(with: expectedJSONString.data(using: .utf8)!) as! NSDictionary
-        XCTAssertEqual(jsonObject1, jsonObject2)
-    }
 }

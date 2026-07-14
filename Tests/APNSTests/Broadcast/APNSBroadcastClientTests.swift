@@ -49,6 +49,8 @@ final class APNSBroadcastClientTests: XCTestCase {
     override func tearDown() async throws {
         try await client?.shutdown()
         try await server?.shutdown()
+        client = nil
+        server = nil
         try await super.tearDown()
     }
 
@@ -172,8 +174,12 @@ final class APNSBroadcastClientTests: XCTestCase {
         let channel = APNSBroadcastChannel(messageStoragePolicy: .mostRecentMessageStored)
         let response = try await client.create(channel: channel, apnsRequestID: requestID)
 
-        // The server returns its own request ID, but we verify the client can handle custom IDs
-        XCTAssertNotNil(response.apnsRequestID)
+        // The server echoes back the `apns-request-id` header the client sent.
+        let requests = server.getBroadcastRequests()
+        let createRequest = try XCTUnwrap(requests.first { $0.method == "POST" })
+        XCTAssertEqual(createRequest.apnsRequestID, requestID.uuidString.lowercased())
+
+        XCTAssertEqual(response.apnsRequestID, requestID)
     }
 
     // MARK: - Helper

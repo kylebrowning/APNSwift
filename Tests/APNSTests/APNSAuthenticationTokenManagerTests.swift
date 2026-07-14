@@ -88,28 +88,6 @@ final class APNSAuthenticationTokenManagerTests: XCTestCase {
         XCTAssertEqual(Double(payload.iat), now, accuracy: 5)
     }
     
-        func testTokenIsReused() async throws {
-   
-            let token1 = try await tokenManager.nextValidToken
-            // 48 minutes later
-            let temp = clock.now.advanced(by: .init(secondsComponent: 2880, attosecondsComponent: 0))
-            clock.now = temp
-            let token2 = try await tokenManager.nextValidToken
-    
-            XCTAssertEqual(token1, token2)
-        }
-
-    func testTokenIsRefreshed() async throws {
-        let token1 = try await tokenManager.nextValidToken
-
-        // 56 minutes later
-        let temp = clock.now.advanced(by: .init(secondsComponent: 3360, attosecondsComponent: 0))
-        clock.now = temp
-        let token2 = try await tokenManager.nextValidToken
-
-        XCTAssertNotEqual(token1, token2)
-    }
-
     /// The refresh window is `[0, 55min)`: a token is still considered valid one
     /// second before 55 minutes, and refreshed at exactly 55 minutes.
     func testTokenReusedJustBeforeBoundaryAndRefreshedAtBoundary() async throws {
