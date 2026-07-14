@@ -75,6 +75,7 @@ public final class APNSBroadcastClient<Decoder: APNSJSONDecoder & Sendable, Enco
     ///   - responseDecoder: The decoder for the responses from APNs.
     ///   - requestEncoder: The encoder for the requests to APNs.
     ///   - byteBufferAllocator: The `ByteBufferAllocator`.
+    ///   - proxy: Upstream proxy, defaults to no proxy.
     public init(
         authenticationMethod: APNSClientConfiguration.AuthenticationMethod,
         environment: APNSBroadcastEnvironment,
@@ -82,7 +83,8 @@ public final class APNSBroadcastClient<Decoder: APNSJSONDecoder & Sendable, Enco
         eventLoopGroupProvider: NIOEventLoopGroupProvider,
         responseDecoder: Decoder,
         requestEncoder: Encoder,
-        byteBufferAllocator: ByteBufferAllocator = .init()
+        byteBufferAllocator: ByteBufferAllocator = .init(),
+        proxy: HTTPClient.Configuration.Proxy? = nil
     ) {
         self.environment = environment
         self.bundleID = bundleID
@@ -108,6 +110,7 @@ public final class APNSBroadcastClient<Decoder: APNSJSONDecoder & Sendable, Enco
         var httpClientConfiguration = HTTPClient.Configuration()
         httpClientConfiguration.tlsConfiguration = tlsConfiguration
         httpClientConfiguration.httpVersion = .automatic
+        httpClientConfiguration.proxy = proxy
 
         switch eventLoopGroupProvider {
         case .shared(let eventLoopGroup):
