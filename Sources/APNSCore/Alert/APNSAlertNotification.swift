@@ -134,6 +134,16 @@ public struct APNSAlertNotification<Payload: Encodable & Sendable>: APNSMessage,
         }
     }
 
+    /// The criteria the system evaluates to determine if it displays the notification in the current Focus.
+    public var filterCriteria: String? {
+        get {
+            self.aps.filterCriteria
+        }
+        set {
+            self.aps.filterCriteria = newValue
+        }
+    }
+
     /// A canonical UUID that identifies the notification. If there is an error sending the notification,
     /// APNs uses this value to identify the notification to your server. The canonical form is 32 lowercase hexadecimal digits,
     /// displayed in five groups separated by hyphens in the form 8-4-4-4-12. An example UUID is as follows:
@@ -180,6 +190,7 @@ public struct APNSAlertNotification<Payload: Encodable & Sendable>: APNSMessage,
     ///   - targetContentID: The identifier of the window brought forward.
     ///   - interruptionLevel: A string that indicates the importance and delivery timing of a notification.
     ///   - relevanceScore: The relevance score, a number between `0` and `1`, that the system uses to sort the notifications from your app.
+    ///   - filterCriteria: The criteria the system evaluates to determine if it displays the notification in the current Focus.
     ///   - apnsID: A canonical UUID that identifies the notification.
     public init(
         alert: APNSAlertNotificationContent,
@@ -195,6 +206,7 @@ public struct APNSAlertNotification<Payload: Encodable & Sendable>: APNSMessage,
         targetContentID: String? = nil,
         interruptionLevel: APNSAlertNotificationInterruptionLevel? = nil,
         relevanceScore: Double? = nil,
+        filterCriteria: String? = nil,
         apnsID: UUID? = nil
     ) {
         self.aps = APNSAlertNotificationAPSStorage(
@@ -206,7 +218,8 @@ public struct APNSAlertNotification<Payload: Encodable & Sendable>: APNSMessage,
             mutableContent: mutableContent,
             targetContentID: targetContentID,
             interruptionLevel: interruptionLevel,
-            relevanceScore: relevanceScore
+            relevanceScore: relevanceScore,
+            filterCriteria: filterCriteria
         )
         self.apnsID = apnsID
         self.expiration = expiration
@@ -243,6 +256,7 @@ extension APNSAlertNotification where Payload == EmptyPayload {
     ///   - targetContentID: The identifier of the window brought forward.
     ///   - interruptionLevel: A string that indicates the importance and delivery timing of a notification.
     ///   - relevanceScore: The relevance score, a number between `0` and `1`, that the system uses to sort the notifications from your app.
+    ///   - filterCriteria: The criteria the system evaluates to determine if it displays the notification in the current Focus.
     ///   - apnsID: A canonical UUID that identifies the notification.
     public init(
         alert: APNSAlertNotificationContent,
@@ -257,6 +271,7 @@ extension APNSAlertNotification where Payload == EmptyPayload {
         targetContentID: String? = nil,
         interruptionLevel: APNSAlertNotificationInterruptionLevel? = nil,
         relevanceScore: Double? = nil,
+        filterCriteria: String? = nil,
         apnsID: UUID? = nil
     ) {
         self.aps = APNSAlertNotificationAPSStorage(
@@ -268,7 +283,8 @@ extension APNSAlertNotification where Payload == EmptyPayload {
             mutableContent: mutableContent,
             targetContentID: targetContentID,
             interruptionLevel: interruptionLevel,
-            relevanceScore: relevanceScore
+            relevanceScore: relevanceScore,
+            filterCriteria: filterCriteria
         )
         self.apnsID = apnsID
         self.expiration = expiration

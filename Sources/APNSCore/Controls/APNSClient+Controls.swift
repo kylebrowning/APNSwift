@@ -14,7 +14,7 @@
 
 
 extension APNSClientProtocol {
-    /// Sends a widgets update notification to APNs.
+    /// Sends a controls update notification to APNs.
     ///
     /// - Parameters:
     ///   - notification: The notification to send.
@@ -24,14 +24,14 @@ extension APNSClientProtocol {
     ///
     @discardableResult
     @inlinable
-    public func sendWidgetsNotification(
-        _ notification: APNSWidgetsNotification,
+    public func sendControlsNotification(
+        _ notification: APNSControlsNotification,
         deviceToken: String
     ) async throws -> APNSResponse {
         let request = APNSRequest(
             message: notification,
             deviceToken: deviceToken,
-            pushType: .widgets,
+            pushType: .controls,
             expiration: nil,
             priority: nil,
             apnsID: notification.apnsID,
@@ -39,23 +39,5 @@ extension APNSClientProtocol {
             collapseID: nil
         )
         return try await send(request)
-    }
-
-    /// Sends a widgets update notification to APNs.
-    ///
-    /// - Parameters:
-    ///   - notification: The notification to send.
-    ///
-    ///   - deviceToken: The hexadecimal bytes that identify the user’s device. Your app receives the bytes for this device token
-    ///    when registering for remote notifications.
-    ///
-    @discardableResult
-    @inlinable
-    @available(*, deprecated, renamed: "sendWidgetsNotification(_:deviceToken:)")
-    public func sendWidgetsNotification(
-        notification: APNSWidgetsNotification,
-        deviceToken: String
-    ) async throws -> APNSResponse {
-        try await self.sendWidgetsNotification(notification, deviceToken: deviceToken)
     }
 }

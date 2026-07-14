@@ -71,6 +71,36 @@ public struct APNSLiveActivityNotification<ContentState: Encodable & Sendable>: 
         }
     }
 
+    /// Timestamp when the notification is marked as stale.
+    public var staleDate: Int? {
+        get {
+            return self.aps.staleDate
+        }
+        set {
+            self.aps.staleDate = newValue
+        }
+    }
+
+    /// An alert that will be sent along with the notification.
+    public var alert: APNSAlertNotificationContent? {
+        get {
+            return self.aps.alert
+        }
+        set {
+            self.aps.alert = newValue
+        }
+    }
+
+    /// The relevance score, a number that the system uses to sort the notifications from your app.
+    public var relevanceScore: Double? {
+        get {
+            return self.aps.relevanceScore
+        }
+        set {
+            self.aps.relevanceScore = newValue
+        }
+    }
+
     /// A canonical UUID that identifies the notification. If there is an error sending the notification,
     /// APNs uses this value to identify the notification to your server. The canonical form is 32 lowercase hexadecimal digits,
     /// displayed in five groups separated by hyphens in the form 8-4-4-4-12. An example UUID is as follows:
@@ -109,6 +139,7 @@ public struct APNSLiveActivityNotification<ContentState: Encodable & Sendable>: 
     ///   - dismissalDate: Timestamp when to dismiss live notification when sent with `end`, if in the past
     ///    dismiss immediately
     ///   - staleDate: Timestamp when the notification is marked as stale
+    ///   - relevanceScore: The relevance score, a number that the system uses to sort the notifications from your app.
     public init(
         expiration: APNSNotificationExpiration,
         priority: APNSPriority,
@@ -119,6 +150,7 @@ public struct APNSLiveActivityNotification<ContentState: Encodable & Sendable>: 
         timestamp: Int,
         dismissalDate: APNSLiveActivityDismissalDate = .none,
         staleDate: Int? = nil,
+        relevanceScore: Double? = nil,
         apnsID: UUID? = nil
     ) {
         self.init(
@@ -131,7 +163,8 @@ public struct APNSLiveActivityNotification<ContentState: Encodable & Sendable>: 
             alert: alert,
             timestamp: timestamp,
             dismissalDate: dismissalDate,
-            staleDate: staleDate
+            staleDate: staleDate,
+            relevanceScore: relevanceScore
         )
     }
 
@@ -152,6 +185,7 @@ public struct APNSLiveActivityNotification<ContentState: Encodable & Sendable>: 
     ///   - dismissalDate: Timestamp when to dismiss live notification when sent with `end`, if in the past
     ///    dismiss immediately
     ///   - staleDate: Timestamp when the notification is marked as stale
+    ///   - relevanceScore: The relevance score, a number that the system uses to sort the notifications from your app.
     public init(
         expiration: APNSNotificationExpiration,
         priority: APNSPriority,
@@ -162,7 +196,8 @@ public struct APNSLiveActivityNotification<ContentState: Encodable & Sendable>: 
         alert: APNSAlertNotificationContent? = nil,
         timestamp: Int,
         dismissalDate: APNSLiveActivityDismissalDate = .none,
-        staleDate: Int? = nil
+        staleDate: Int? = nil,
+        relevanceScore: Double? = nil
     ) {
         self.aps = APNSLiveActivityNotificationAPSStorage(
             timestamp: timestamp,
@@ -170,7 +205,8 @@ public struct APNSLiveActivityNotification<ContentState: Encodable & Sendable>: 
             contentState: contentState,
             dismissalDate: dismissalDate.dismissal,
             staleDate: staleDate,
-            alert: alert
+            alert: alert,
+            relevanceScore: relevanceScore
         )
         self.apnsID = apnsID
         self.expiration = expiration

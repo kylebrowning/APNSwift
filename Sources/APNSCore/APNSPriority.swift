@@ -22,4 +22,8 @@ public struct APNSPriority: Hashable, Encodable, Sendable {
 
     /// Specifies that the notification should be send based on power considerations on the user’s device.
     public static let consideringDevicePower = Self(rawValue: 5)
+
+    /// Specifies that the notification should be sent in a way that prioritizes the device’s power
+    /// considerations over all other factors, and prevents awakening the device.
+    public static let prioritizeDevicePower = Self(rawValue: 1)
 }

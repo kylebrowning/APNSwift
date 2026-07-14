@@ -23,6 +23,7 @@ struct APNSAlertNotificationAPSStorage: Encodable, Sendable {
         case targetContentID = "target-content-id"
         case interruptionLevel = "interruption-level"
         case relevanceScore = "relevance-score"
+        case filterCriteria = "filter-criteria"
     }
 
     var alert: APNSAlertNotificationContent
@@ -49,6 +50,8 @@ struct APNSAlertNotificationAPSStorage: Encodable, Sendable {
         }
     }
 
+    var filterCriteria: String?
+
     init(
         alert: APNSAlertNotificationContent,
         badge: Int? = nil,
@@ -58,7 +61,8 @@ struct APNSAlertNotificationAPSStorage: Encodable, Sendable {
         mutableContent: Double? = nil,
         targetContentID: String? = nil,
         interruptionLevel: APNSAlertNotificationInterruptionLevel? = nil,
-        relevanceScore: Double? = nil
+        relevanceScore: Double? = nil,
+        filterCriteria: String? = nil
     ) {
         if let relevanceScore = relevanceScore {
             precondition(relevanceScore >= 0 && relevanceScore <= 1, "The relevance score can only be between 0 and 1")
@@ -72,5 +76,6 @@ struct APNSAlertNotificationAPSStorage: Encodable, Sendable {
         self.targetContentID = targetContentID
         self.interruptionLevel = interruptionLevel
         self.relevanceScore = relevanceScore
+        self.filterCriteria = filterCriteria
     }
 }

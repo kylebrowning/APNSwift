@@ -18,8 +18,8 @@ import struct FoundationEssentials.UUID
 import struct Foundation.UUID
 #endif
 
-/// A widget update notification.
-public struct APNSWidgetsNotification: APNSMessage {
+/// A controls update notification.
+public struct APNSControlsNotification: APNSMessage {
     @usableFromInline
     struct APS: Encodable, Sendable {
         enum CodingKeys: String, CodingKey {
@@ -46,13 +46,13 @@ public struct APNSWidgetsNotification: APNSMessage {
     /// If you omit this, a new UUID is created by APNs and returned in the response.
     public var apnsID: UUID?
 
-    /// The topic for the notification. In general, the topic is your app’s bundle ID/app ID suffixed with `.push-type.widgets`.
+    /// The topic for the notification. In general, the topic is your app’s bundle ID/app ID suffixed with `.push-type.controls`.
     public var topic: String
 
-    /// Initializes a new ``APNSWidgetsNotification``.
+    /// Initializes a new ``APNSControlsNotification``.
     ///
     /// - Parameters:
-    ///   - appID: Your app’s bundle ID/app ID. This will be suffixed with `.push-type.widgets`.
+    ///   - appID: Your app’s bundle ID/app ID. This will be suffixed with `.push-type.controls`.
     ///   - apnsID: A canonical UUID that identifies the notification.
     @inlinable
     public init(
@@ -60,15 +60,15 @@ public struct APNSWidgetsNotification: APNSMessage {
         apnsID: UUID? = nil
     ) {
         self.init(
-            topic: appID + ".push-type.widgets",
+            topic: appID + ".push-type.controls",
             apnsID: apnsID
         )
     }
 
-    /// Initializes a new ``APNSWidgetsNotification``.
+    /// Initializes a new ``APNSControlsNotification``.
     ///
     /// - Parameters:
-    ///   - topic: The topic for the notification. In general, the topic is your app’s bundle ID/app ID suffixed with `.push-type.widgets`.
+    ///   - topic: The topic for the notification. In general, the topic is your app’s bundle ID/app ID suffixed with `.push-type.controls`.
     ///   - apnsID: A canonical UUID that identifies the notification.
     @inlinable
     public init(
