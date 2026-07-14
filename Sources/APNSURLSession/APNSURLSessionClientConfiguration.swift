@@ -22,16 +22,18 @@ public struct APNSURLSessionClientConfiguration {
         case jwt(privateKey: P256.Signing.PrivateKey, teamIdentifier: String, keyIdentifier: String)
     }
 
-    /// The authentication method used by the ``APNSURLSessionClient``.
-    public var authenticationMethod: AuthenticationMethod
-
     /// The environment used by the ``APNSURLSessionClient``.
     public var environment: APNSEnvironment
-    
-    private let authenticationTokenManager: APNSAuthenticationTokenManager<ContinuousClock>
-    
+
+    /// Type-erased access to the generic ``APNSAuthenticationTokenManager``.
+    ///
+    /// The token manager is generic over its ``Clock``, but this configuration is not, so the
+    /// concrete, caller-injected clock is captured in this closure at ``init`` time rather than
+    /// stored as a typed property.
+    private let nextValidTokenClosure: @Sendable () async throws -> String
+
     internal func nextValidToken() async throws -> String {
-        try await authenticationTokenManager.nextValidToken
+        try await nextValidTokenClosure()
     }
 
     /// Initializes a new ``APNSClient.Configuration``.
@@ -41,22 +43,25 @@ public struct APNSURLSessionClientConfiguration {
     ///   - privateKey: The private encryption key obtained through the developer portal.
     ///   - keyIdentifier: The private encryption key identifier obtained through the developer portal.
     ///   - teamIdentifier: The team id.
-    public init(
+    ///   - clock: The clock used to determine when a generated authentication token has expired.
+    public init<APNSClock: Clock>(
         environment: APNSEnvironment,
         privateKey: P256.Signing.PrivateKey,
         keyIdentifier: String,
         teamIdentifier: String,
-        clock: any Clock = ContinuousClock()
-    ) {
-        self.authenticationMethod = .jwt(privateKey: privateKey, teamIdentifier: teamIdentifier, keyIdentifier: keyIdentifier)
+        clock: APNSClock = ContinuousClock()
+    ) where APNSClock.Duration == Duration {
         self.environment = environment
-        
-        self.authenticationTokenManager = APNSAuthenticationTokenManager(
+
+        let authenticationTokenManager = APNSAuthenticationTokenManager(
             privateKey: privateKey,
             teamIdentifier: teamIdentifier,
             keyIdentifier: keyIdentifier,
-            clock: ContinuousClock()
+            clock: clock
         )
+        self.nextValidTokenClosure = {
+            try await authenticationTokenManager.nextValidToken
+        }
     }
 }
 

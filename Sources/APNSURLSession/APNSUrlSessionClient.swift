@@ -9,12 +9,16 @@ enum APNSUrlSessionClientError: Error {
 public struct APNSURLSessionClient: APNSClientProtocol {
     
     private let configuration: APNSURLSessionClientConfiguration
-    
+
+    /// The `URLSession` used to make requests to APNs.
+    let session: URLSession
+
     let encoder = JSONEncoder()
     let decoder = JSONDecoder()
-    
-    public init(configuration: APNSURLSessionClientConfiguration) {
+
+    public init(configuration: APNSURLSessionClientConfiguration, session: URLSession = .shared) {
         self.configuration = configuration
+        self.session = session
     }
     
     public func send(
@@ -26,6 +30,7 @@ public struct APNSURLSessionClient: APNSClientProtocol {
         urlRequest.httpMethod = "POST"
         /// Set headers
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.setValue("APNS/swift-urlsession", forHTTPHeaderField: "user-agent")
         for (header, value) in request.headers {
             urlRequest.setValue(value, forHTTPHeaderField: header)
         }
@@ -36,7 +41,7 @@ public struct APNSURLSessionClient: APNSClientProtocol {
         urlRequest.httpBody = try encoder.encode(request.message)
     
         /// Make request
-        let (data, response) = try await URLSession.shared.data(for: urlRequest)
+        let (data, response) = try await session.data(for: urlRequest)
 
         /// Unwrap response
         guard let response = response as? HTTPURLResponse else {

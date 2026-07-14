@@ -104,6 +104,102 @@ final class APNSURLSessionClientTests: XCTestCase {
         }
     }
 
+    func testSendAlert_propagatesAllHeaders() async throws {
+        let apnsID = UUID()
+        var alert = APNSAlertNotification(
+            alert: .init(title: .raw("title")),
+            expiration: .immediately,
+            priority: .immediately,
+            topic: "com.example.app",
+            payload: EmptyPayload(),
+            apnsID: apnsID
+        )
+        alert.collapseID = "collapse-123"
+
+        _ = try await client.sendAlertNotification(alert, deviceToken: Self.validDeviceToken)
+
+        let sent = try XCTUnwrap(server.getSentNotifications().first)
+        XCTAssertEqual(sent.deviceToken, Self.validDeviceToken)
+        XCTAssertEqual(sent.pushType, "alert")
+        XCTAssertEqual(sent.topic, "com.example.app")
+        XCTAssertEqual(sent.priority, "10")
+        XCTAssertEqual(sent.expiration, "0")
+        XCTAssertEqual(sent.collapseID, "collapse-123")
+        XCTAssertEqual(sent.apnsID, apnsID)
+    }
+
+    func testSendAlert_unregisteredCarriesTimestamp() async throws {
+        do {
+            _ = try await client.sendAlertNotification(
+                Self.makeAlert(),
+                deviceToken: APNSTestServer.unregisteredDeviceToken
+            )
+            XCTFail("Expected an APNSError to be thrown")
+        } catch let error as APNSError {
+            XCTAssertEqual(error.responseStatus, 410)
+            XCTAssertEqual(error.reason, .unregistered)
+            let timestamp = try XCTUnwrap(error.timestamp)
+            XCTAssertEqual(
+                timestamp.timeIntervalSince1970,
+                Double(APNSTestServer.unregisteredTimestampMilliseconds) / 1000,
+                accuracy: 0.001
+            )
+        }
+    }
+
+    func testInjectedClockDrivesTokenRefresh() async throws {
+        let clock = TestClock<Duration>()
+        let testServer = server!
+        let clockedClient = APNSURLSessionClient(
+            configuration: .init(
+                environment: .custom(url: "http://127.0.0.1", port: testServer.port),
+                privateKey: try P256.Signing.PrivateKey(pemRepresentation: Self.jwtPrivateKey),
+                keyIdentifier: "MY_KEY_ID",
+                teamIdentifier: "MY_TEAM_ID",
+                clock: clock
+            )
+        )
+
+        _ = try await clockedClient.sendAlertNotification(
+            Self.makeAlert(),
+            deviceToken: Self.validDeviceToken
+        )
+
+        // Advance past the manager's 55 minute refresh window so a new token must be minted.
+        clock.now = clock.now.advanced(by: .init(secondsComponent: 3360, attosecondsComponent: 0))
+
+        _ = try await clockedClient.sendAlertNotification(
+            Self.makeAlert(),
+            deviceToken: Self.validDeviceToken
+        )
+
+        let sent = testServer.getSentNotifications()
+        XCTAssertEqual(sent.count, 2)
+        let firstAuthorization = try XCTUnwrap(sent[0].authorization)
+        let secondAuthorization = try XCTUnwrap(sent[1].authorization)
+        XCTAssertNotEqual(firstAuthorization, secondAuthorization)
+    }
+
+    func testSendAlert_customSessionIsUsed() async throws {
+        let customSession = URLSession(configuration: .ephemeral)
+        let customClient = APNSURLSessionClient(
+            configuration: .init(
+                environment: .custom(url: "http://127.0.0.1", port: server.port),
+                privateKey: try P256.Signing.PrivateKey(pemRepresentation: Self.jwtPrivateKey),
+                keyIdentifier: "MY_KEY_ID",
+                teamIdentifier: "MY_TEAM_ID"
+            ),
+            session: customSession
+        )
+
+        let response = try await customClient.sendAlertNotification(
+            Self.makeAlert(),
+            deviceToken: Self.validDeviceToken
+        )
+
+        XCTAssertNotNil(response.apnsID)
+    }
+
     // MARK: - Helpers
 
     private static let validDeviceToken = String(repeating: "a", count: 64)
