@@ -94,6 +94,11 @@ public struct APNSComplicationNotification<Payload: Encodable & Sendable>: APNSM
         self.payload = payload
         self.apnsID = apnsID
     }
+
+    @inlinable
+    public func encode(to encoder: Encoder) throws {
+        try self.payload.encode(to: encoder)
+    }
 }
 
 extension APNSComplicationNotification where Payload == EmptyPayload {

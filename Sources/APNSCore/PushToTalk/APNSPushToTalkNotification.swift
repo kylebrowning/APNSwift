@@ -97,6 +97,11 @@ public struct APNSPushToTalkNotification<Payload: Encodable & Sendable>: APNSMes
         self.payload = payload
         self.apnsID = apnsID
     }
+
+    @inlinable
+    public func encode(to encoder: Encoder) throws {
+        try self.payload.encode(to: encoder)
+    }
 }
 
 extension APNSPushToTalkNotification where Payload == EmptyPayload {

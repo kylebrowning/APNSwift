@@ -36,8 +36,8 @@ public struct APNSLocationNotification: APNSMessage {
 
     /// Initializes a new ``APNSLocationNotification``.
     ///
-    /// - Important: Your dynamic payload will get encoded to the root of the JSON payload that is send to APNs.
-    /// It is **important** that you do not encode anything with the key `aps`
+    /// - Important: This notification sends a fixed, minimal body containing only an empty `aps` object;
+    /// it has no dynamic payload.
     ///
     /// - Parameters:
     ///   - priority: The priority of the notification.
@@ -58,8 +58,8 @@ public struct APNSLocationNotification: APNSMessage {
 
     /// Initializes a new ``APNSLocationNotification``.
     ///
-    /// - Important: Your dynamic payload will get encoded to the root of the JSON payload that is send to APNs.
-    /// It is **important** that you do not encode anything with the key `aps`
+    /// - Important: This notification sends a fixed, minimal body containing only an empty `aps` object;
+    /// it has no dynamic payload.
     ///
     /// - Parameters:
     ///   - priority: The priority of the notification.
@@ -74,5 +74,16 @@ public struct APNSLocationNotification: APNSMessage {
         self.priority = priority
         self.topic = topic
         self.apnsID = apnsID
+    }
+
+    internal enum CodingKeys: String, CodingKey {
+        case aps
+    }
+
+    internal struct EmptyAPS: Encodable {}
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(EmptyAPS(), forKey: .aps)
     }
 }
