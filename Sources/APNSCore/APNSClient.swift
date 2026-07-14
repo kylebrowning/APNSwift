@@ -12,7 +12,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-public protocol APNSClientProtocol {
+public protocol APNSClientProtocol: Sendable {
     func send(_ request: APNSRequest<some APNSMessage>) async throws -> APNSResponse
     func shutdown() async throws
 }

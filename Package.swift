@@ -23,7 +23,6 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.42.0"),
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.6.0"),
-        .package(url: "https://github.com/apple/swift-nio-http2.git", from: "1.9.0"),
     ],
     targets: [
         .executableTarget(
@@ -67,13 +66,9 @@ let package = Package(
         .target(
             name: "APNSTestServer",
             dependencies: [
-                .product(name: "Logging", package: "swift-log"),
-                .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "NIOPosix", package: "swift-nio"),
-                .product(name: "NIOSSL", package: "swift-nio-ssl"),
                 .product(name: "NIOHTTP1", package: "swift-nio"),
-                .product(name: "NIOHTTP2", package: "swift-nio-http2"),
                 .product(name: "NIOConcurrencyHelpers", package: "swift-nio"),
             ]
         ),
