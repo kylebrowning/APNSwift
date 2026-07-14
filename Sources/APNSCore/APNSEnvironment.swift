@@ -41,6 +41,13 @@ public struct APNSEnvironment: Sendable {
     public var absoluteURL: String {
         "\(url):\(port)/3/device"
     }
-    
-    
+
+    /// The fully constructed URL for publishing a broadcast push notification.
+    ///
+    /// Broadcast pushes are sent to the regular device-push host, not the channel-management host.
+    ///
+    /// - Parameter bundleID: The app's bundle identifier.
+    public func broadcastSendURL(bundleID: String) -> String {
+        "\(url):\(port)/4/broadcasts/apps/\(bundleID)"
+    }
 }
