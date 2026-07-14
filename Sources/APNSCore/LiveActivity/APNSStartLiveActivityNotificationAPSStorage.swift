@@ -23,6 +23,9 @@ struct APNSStartLiveActivityNotificationAPSStorage<Attributes: Encodable & Senda
         case alert = "alert"
         case attributes = "attributes"
         case attributesType = "attributes-type"
+        case relevanceScore = "relevance-score"
+        case inputPushToken = "input-push-token"
+        case inputPushChannel = "input-push-channel"
     }
 
     var timestamp: Int
@@ -32,6 +35,9 @@ struct APNSStartLiveActivityNotificationAPSStorage<Attributes: Encodable & Senda
     var alert: APNSAlertNotificationContent
     var attributes: Attributes
     var attributesType: String
+    var relevanceScore: Double?
+    var inputPushToken: Int?
+    var inputPushChannel: String?
 
     init(
         timestamp: Int,
@@ -39,7 +45,10 @@ struct APNSStartLiveActivityNotificationAPSStorage<Attributes: Encodable & Senda
         staleDate: Int?,
         alert: APNSAlertNotificationContent,
         attributes: Attributes,
-        attributesType: String
+        attributesType: String,
+        relevanceScore: Double? = nil,
+        inputPushToken: Int? = nil,
+        inputPushChannel: String? = nil
     ) {
         self.timestamp = timestamp
         self.contentState = contentState
@@ -47,5 +56,8 @@ struct APNSStartLiveActivityNotificationAPSStorage<Attributes: Encodable & Senda
         self.alert = alert
         self.attributes = attributes
         self.attributesType = attributesType
+        self.relevanceScore = relevanceScore
+        self.inputPushToken = inputPushToken
+        self.inputPushChannel = inputPushChannel
     }
 }

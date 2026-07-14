@@ -137,4 +137,44 @@ final class APNSAlertNotificationTests: XCTestCase {
         let jsonObject2 = try JSONSerialization.jsonObject(with: expectedJSONString.data(using: .utf8)!) as! NSDictionary
         XCTAssertEqual(jsonObject1, jsonObject2)
     }
+
+    func testEncode_whenFilterCriteria() throws {
+        struct Payload: Encodable {
+            let payload = "payload"
+        }
+        let notification = APNSAlertNotification(
+            alert: .init(
+                title: .raw("title"),
+                subtitle: .localized(
+                    key: "subtitle-key",
+                    arguments: ["arg1"]
+                ),
+                body: .raw("body"),
+                launchImage: "launchimage"
+            ),
+            expiration: .timeIntervalSince1970InSeconds(1_652_693_147),
+            priority: .consideringDevicePower,
+            topic: "topic",
+            payload: Payload(),
+            badge: 1,
+            sound: .default,
+            threadID: "threadID",
+            category: "category",
+            mutableContent: 1,
+            targetContentID: "targetContentID",
+            interruptionLevel: .critical,
+            relevanceScore: 1,
+            filterCriteria: "user123",
+            apnsID: .init()
+        )
+        let encoder = JSONEncoder()
+        let data = try encoder.encode(notification)
+
+        let expectedJSONString = """
+        {\"payload\":\"payload\",\"aps\":{\"category\":\"category\",\"relevance-score\":1,\"filter-criteria\":\"user123\",\"badge\":1,\"target-content-id\":\"targetContentID\",\"sound\":\"default\",\"interruption-level\":\"critical\",\"alert\":{\"body\":\"body\",\"subtitle-loc-key\":\"subtitle-key\",\"title\":\"title\",\"launch-image\":\"launchimage\",\"subtitle-loc-args\":[\"arg1\"]},\"thread-id\":\"threadID\",\"mutable-content\":1}}
+        """
+        let jsonObject1 = try JSONSerialization.jsonObject(with: data) as! NSDictionary
+        let jsonObject2 = try JSONSerialization.jsonObject(with: expectedJSONString.data(using: .utf8)!) as! NSDictionary
+        XCTAssertEqual(jsonObject1, jsonObject2)
+    }
 }

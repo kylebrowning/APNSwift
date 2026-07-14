@@ -26,6 +26,7 @@ public struct APNSPushType: Hashable, Sendable, CustomStringConvertible {
         case liveactivity
         case pushtotalk
         case widgets
+        case controls
     }
     
     public var description: String {
@@ -115,4 +116,10 @@ public struct APNSPushType: Hashable, Sendable, CustomStringConvertible {
     /// - Important: if you set this push type, the topic must use your app’s bundle ID with `.push-type.widgets` appended to the end.
     ///
     public static let widgets = Self(configuration: .widgets)
+
+    /// Use the controls push type to reload or update a Control Center control.
+    ///
+    /// - Important: if you set this push type, the topic must use your app’s bundle ID with `.push-type.controls` appended to the end.
+    ///
+    public static let controls = Self(configuration: .controls)
 }

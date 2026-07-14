@@ -63,6 +63,17 @@ public struct APNSStartLiveActivityNotification<Attributes: Encodable & Sendable
         }
     }
 
+    /// The relevance score, a number that the system uses to sort the notifications from your app.
+    public var relevanceScore: Double? {
+        get {
+            return self.aps.relevanceScore
+        }
+
+        set {
+            self.aps.relevanceScore = newValue
+        }
+    }
+
     /// A canonical UUID that identifies the notification. If there is an error sending the notification,
     /// APNs uses this value to identify the notification to your server. The canonical form is 32 lowercase hexadecimal digits,
     /// displayed in five groups separated by hyphens in the form 8-4-4-4-12. An example UUID is as follows:
@@ -100,6 +111,8 @@ public struct APNSStartLiveActivityNotification<Attributes: Encodable & Sendable
     ///   - attributes: The ActivityAttributes of the live activity to start
     ///   - attributesType: The type name of the ActivityAttributes you want to send
     ///   - alert: An alert that will be sent along with the notification
+    ///   - relevanceScore: The relevance score, a number that the system uses to sort the notifications from your app.
+    ///   - inputPushMethod: The mechanism the started activity uses to receive subsequent updates (iOS 18+).
     public init(
         expiration: APNSNotificationExpiration,
         priority: APNSPriority,
@@ -110,19 +123,83 @@ public struct APNSStartLiveActivityNotification<Attributes: Encodable & Sendable
         apnsID: UUID? = nil,
         attributes: Attributes,
         attributesType: String,
-        alert: APNSAlertNotificationContent
+        alert: APNSAlertNotificationContent,
+        relevanceScore: Double? = nil,
+        inputPushMethod: APNSLiveActivityInputPushMethod? = nil
     ) {
-      self.aps = APNSStartLiveActivityNotificationAPSStorage(
-          timestamp: timestamp,
-          contentState: contentState,
-          staleDate: staleDate,
-          alert: alert,
-          attributes: attributes,
-          attributesType: attributesType
-			)
-			self.apnsID = apnsID
-			self.expiration = expiration
-			self.priority = priority
-			self.topic = appID + ".push-type.liveactivity"
+        self.init(
+            expiration: expiration,
+            priority: priority,
+            topic: appID + ".push-type.liveactivity",
+            apnsID: apnsID,
+            contentState: contentState,
+            timestamp: timestamp,
+            staleDate: staleDate,
+            attributes: attributes,
+            attributesType: attributesType,
+            alert: alert,
+            relevanceScore: relevanceScore,
+            inputPushMethod: inputPushMethod
+        )
+    }
+
+    /// Initializes a new ``APNSStartLiveActivityNotification``.
+    ///
+    /// - Important: Your dynamic payload will get encoded to the root of the JSON payload that is send to APNs.
+    /// It is **important** that you do not encode anything with the key `aps`
+    ///
+    /// - Parameters:
+    ///   - expiration: The date when the notification is no longer valid and can be discarded.
+    ///   - priority: The priority of the notification.
+    ///   - topic: The topic for the notification. In general, the topic is your app’s bundle ID/app ID suffixed with `.push-type.liveactivity`.
+    ///   - apnsID: A canonical UUID that identifies the notification.
+    ///   - contentState: Updated content-state of live activity
+    ///   - timestamp: Timestamp when sending notification
+    ///   - staleDate: Timestamp when the notification is marked as stale
+    ///   - attributes: The ActivityAttributes of the live activity to start
+    ///   - attributesType: The type name of the ActivityAttributes you want to send
+    ///   - alert: An alert that will be sent along with the notification
+    ///   - relevanceScore: The relevance score, a number that the system uses to sort the notifications from your app.
+    ///   - inputPushMethod: The mechanism the started activity uses to receive subsequent updates (iOS 18+).
+    public init(
+        expiration: APNSNotificationExpiration,
+        priority: APNSPriority,
+        topic: String,
+        apnsID: UUID? = nil,
+        contentState: ContentState,
+        timestamp: Int,
+        staleDate: Int? = nil,
+        attributes: Attributes,
+        attributesType: String,
+        alert: APNSAlertNotificationContent,
+        relevanceScore: Double? = nil,
+        inputPushMethod: APNSLiveActivityInputPushMethod? = nil
+    ) {
+        var inputPushToken: Int? = nil
+        var inputPushChannel: String? = nil
+        switch inputPushMethod?.configuration {
+        case .token:
+            inputPushToken = 1
+        case let .channel(channelID):
+            inputPushChannel = channelID
+        case nil:
+            break
+        }
+
+        self.aps = APNSStartLiveActivityNotificationAPSStorage(
+            timestamp: timestamp,
+            contentState: contentState,
+            staleDate: staleDate,
+            alert: alert,
+            attributes: attributes,
+            attributesType: attributesType,
+            relevanceScore: relevanceScore,
+            inputPushToken: inputPushToken,
+            inputPushChannel: inputPushChannel
+        )
+        self.apnsID = apnsID
+        self.expiration = expiration
+        self.priority = priority
+        self.topic = topic
     }
 }

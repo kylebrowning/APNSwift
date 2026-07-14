@@ -20,6 +20,7 @@ struct APNSLiveActivityNotificationAPSStorage<ContentState: Encodable & Sendable
         case dismissalDate = "dismissal-date"
         case staleDate = "stale-date"
         case alert = "alert"
+        case relevanceScore = "relevance-score"
     }
 
     var timestamp: Int
@@ -28,6 +29,7 @@ struct APNSLiveActivityNotificationAPSStorage<ContentState: Encodable & Sendable
     var dismissalDate: Int?
     var staleDate: Int?
     var alert: APNSAlertNotificationContent?
+    var relevanceScore: Double?
 
     init(
         timestamp: Int,
@@ -35,7 +37,8 @@ struct APNSLiveActivityNotificationAPSStorage<ContentState: Encodable & Sendable
         contentState: ContentState,
         dismissalDate: Int?,
         staleDate: Int?,
-        alert: APNSAlertNotificationContent? = nil
+        alert: APNSAlertNotificationContent? = nil,
+        relevanceScore: Double? = nil
     ) {
         self.timestamp = timestamp
         self.contentState = contentState
@@ -43,5 +46,6 @@ struct APNSLiveActivityNotificationAPSStorage<ContentState: Encodable & Sendable
         self.staleDate = staleDate
         self.event = event
         self.alert = alert
+        self.relevanceScore = relevanceScore
     }
 }
