@@ -193,16 +193,18 @@ extension APNSBroadcastClient {
             return APNSBroadcastResponse(apnsRequestID: apnsRequestID, channelID: channelID, body: responseBody)
         }
 
-        // Handle error responses
-        let body = try await response.body.collect(upTo: 1024)
-        let errorResponse = try responseDecoder.decode(APNSErrorResponse.self, from: body)
+        // Handle error responses. An empty body, non-JSON body, or a body exceeding the
+        // collection limit must still surface as a typed `APNSError` (with `reason: nil`)
+        // rather than a raw decoding error, so the caller never loses the status code and headers.
+        let errorBody = try? await response.body.collect(upTo: 1024)
+        let errorResponse = errorBody.flatMap { try? responseDecoder.decode(APNSErrorResponse.self, from: $0) }
 
         let error = APNSError(
             responseStatus: Int(response.status.code),
             apnsID: nil,
             apnsUniqueID: nil,
             apnsResponse: errorResponse,
-            timestamp: errorResponse.timestampInSeconds.flatMap { Date(timeIntervalSince1970: $0) }
+            timestamp: errorResponse?.timestampInSeconds.flatMap { Date(timeIntervalSince1970: $0) }
         )
 
         throw error

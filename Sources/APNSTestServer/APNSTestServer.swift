@@ -475,7 +475,7 @@ public final class APNSTestServer: @unchecked Sendable {
         headers.add(name: "content-type", value: "application/json")
 
         guard let channel = broadcastChannelsBox.withLockedValue({ $0[channelID] }) else {
-            return (.notFound, headers, "{\"reason\":\"NotFound\"}")
+            return (.badRequest, headers, "{\"reason\":\"ChannelNotRegistered\"}")
         }
 
         let responseJSON = """
@@ -489,7 +489,7 @@ public final class APNSTestServer: @unchecked Sendable {
 
         guard broadcastChannelsBox.withLockedValue({ $0.removeValue(forKey: channelID) }) != nil else {
             headers.add(name: "content-type", value: "application/json")
-            return (.notFound, headers, "{\"reason\":\"NotFound\"}")
+            return (.badRequest, headers, "{\"reason\":\"ChannelNotRegistered\"}")
         }
 
         return (.noContent, headers, "")
