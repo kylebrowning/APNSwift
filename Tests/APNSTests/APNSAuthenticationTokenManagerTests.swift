@@ -55,11 +55,8 @@ final class APNSAuthenticationTokenManagerTests: XCTestCase {
         let splitToken = try XCTUnwrap(token.split(separator: " ").last)
             .split(separator: ".")
         
-        let decodedHeader = try Base64.decode(
-            string: String(splitToken[0]),
-            options: [.base64UrlAlphabet, .omitPaddingCharacter]
-        )
-        let header = String(bytes: decodedHeader, encoding: .utf8)
+        let decodedHeader = try XCTUnwrap(base64URLDecoded(String(splitToken[0])))
+        let header = String(data: decodedHeader, encoding: .utf8)
         let expectedHeader = """
         {
             "alg": "ES256",
@@ -69,10 +66,7 @@ final class APNSAuthenticationTokenManagerTests: XCTestCase {
         """
         XCTAssertEqual(header, expectedHeader)
         
-        let decodedPayload = try Base64.decode(
-            string: String(splitToken[1]),
-            options: [.base64UrlAlphabet, .omitPaddingCharacter]
-        )
+        let decodedPayload = try XCTUnwrap(base64URLDecoded(String(splitToken[1])))
 
         // The expected `iat` is computed *after* token generation, so comparing raw strings
         // is flaky across second boundaries. Instead, decode the JSON and assert `iss` plus
@@ -81,7 +75,7 @@ final class APNSAuthenticationTokenManagerTests: XCTestCase {
             let iss: String
             let iat: Int64
         }
-        let payload = try JSONDecoder().decode(Payload.self, from: Data(decodedPayload))
+        let payload = try JSONDecoder().decode(Payload.self, from: decodedPayload)
         let now = Date().timeIntervalSince1970
 
         XCTAssertEqual(payload.iss, "foo")
@@ -125,11 +119,8 @@ final class APNSAuthenticationTokenManagerTests: XCTestCase {
     }
 
     private func decodeSegment(_ segment: Substring) throws -> String {
-        let bytes = try Base64.decode(
-            string: String(segment),
-            options: [.base64UrlAlphabet, .omitPaddingCharacter]
-        )
-        return try XCTUnwrap(String(bytes: bytes, encoding: .utf8))
+        let data = try XCTUnwrap(base64URLDecoded(String(segment)))
+        return try XCTUnwrap(String(data: data, encoding: .utf8))
     }
 }
 

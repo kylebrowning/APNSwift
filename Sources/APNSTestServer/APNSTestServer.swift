@@ -22,7 +22,6 @@ import struct Foundation.Date
 import class Foundation.JSONSerialization
 import class Foundation.JSONDecoder
 import class Foundation.NSNumber
-import struct Foundation.CharacterSet
 
 /// A comprehensive mock server that simulates Apple Push Notification service APIs.
 ///

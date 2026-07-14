@@ -1,11 +1,12 @@
 //===----------------------------------------------------------------------===//
 //
-// This source file is part of the swift-extras-base64 open source project
+// This source file is part of the APNSwift open source project
 //
-// Copyright (c) 2022 the swift-extras-base64 project authors
+// Copyright (c) 2022 the APNSwift project authors
 // Licensed under Apache License v2.0
 //
 // See LICENSE.txt for license information
+// See CONTRIBUTORS.txt for the list of APNSwift project authors
 //
 // SPDX-License-Identifier: Apache-2.0
 //

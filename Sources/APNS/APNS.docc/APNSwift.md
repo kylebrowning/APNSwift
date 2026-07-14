@@ -68,18 +68,8 @@ These can be configured when created your `APNSClientConfiguration`
 openssl pkcs8 -nocrypt -in /path/to/my/key.p8 -out ~/Downloads/key.pem
 ```
 
-## Logging
-By default APNSwift has a no-op logger which will not log anything. However if you pass a logger in, you will see logs.
-
-There are currently two kinds of loggers.
-#### **Background Activity Logger**
-This logger can be passed into the `APNSClient` and will log background things like connection pooling, auth token refreshes, etc. 
-
-#### **Notification Send Logger**
-This logger can be passed into any of the `send:` methods and will log everything related to a single send request. 
-
 ## Server Example
-Take a look at [Program.swift](https://github.com/swift-server-community/APNSwift/blob/main/Sources/APNSwiftExample/Program.swift)
+Take a look at [Program.swift](https://github.com/swift-server-community/APNSwift/blob/main/Sources/APNSExample/Program.swift)
 
 ## iOS Examples
 

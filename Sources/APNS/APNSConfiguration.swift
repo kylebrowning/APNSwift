@@ -15,7 +15,6 @@
 import APNSCore
 @preconcurrency import Crypto
 import NIOSSL
-import NIOTLS
 import AsyncHTTPClient
 
 /// The configuration of an ``APNSClient``.

@@ -19,7 +19,12 @@ import struct Foundation.UUID
 #endif
 
 public struct APNSRequest<Message: APNSMessage> {
-    fileprivate final class _Storage {
+    // `_Storage` is a private copy-on-write backing store: `APNSRequest`'s mutating accessors
+    // always check `isKnownUniquelyReferenced` before mutating in place, copying first if the
+    // storage might be shared. That discipline guarantees exclusive access to any given
+    // instance's mutable state, so sharing it across concurrency domains is safe even though
+    // its properties are `var`.
+    fileprivate final class _Storage: @unchecked Sendable {
         var message: Message
         var deviceToken: String
         var pushType: APNSPushType
@@ -107,6 +112,8 @@ public struct APNSRequest<Message: APNSMessage> {
         )
     }
 }
+
+extension APNSRequest: Sendable where Message: Sendable {}
 
 extension APNSRequest._Storage {
     func copy() -> APNSRequest._Storage {

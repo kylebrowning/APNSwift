@@ -14,7 +14,7 @@
 
 /// A struct for the error response of APNs.
 ///
-/// This is just used to decode the JSON and should not be exposed.
+/// This decodes the JSON body APNs returns alongside a non-success status code.
 public struct APNSErrorResponse: Codable, Sendable {
     /// The error code indicating the reason for the failure.
     public var reason: String
