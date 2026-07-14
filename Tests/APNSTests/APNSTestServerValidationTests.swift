@@ -21,6 +21,24 @@ import NIOCore
 import NIOHTTP1
 import AsyncHTTPClient
 
+/// Builds a fake (unsigned) provider authentication token in the shape the mock server expects:
+/// `base64url(header).base64url(payload).base64url(signature)`. The server never verifies the
+/// ES256 signature (it has no public key), so any bytes work there.
+private func makeTestJWT(iss: String = "team", kid: String = "key", iatOffset: TimeInterval = 0) -> String {
+    func base64url(_ string: String) -> String {
+        Data(string.utf8).base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }
+
+    let header = "{\"alg\":\"ES256\",\"typ\":\"JWT\",\"kid\":\"\(kid)\"}"
+    let iat = Int(Date().timeIntervalSince1970 + iatOffset)
+    let payload = "{\"iss\":\"\(iss)\",\"iat\":\(iat)}"
+
+    return "\(base64url(header)).\(base64url(payload)).\(base64url("sig"))"
+}
+
 final class APNSTestServerValidationTests: XCTestCase {
     var server: APNSTestServer!
     var httpClient: HTTPClient!
@@ -270,6 +288,7 @@ final class APNSTestServerValidationTests: XCTestCase {
         request.headers.add(name: "apns-topic", value: "com.example.app")
         request.headers.add(name: "apns-push-type", value: "alert")
         request.headers.add(name: "content-type", value: "application/json")
+        request.headers.add(name: "authorization", value: "bearer \(makeTestJWT())")
         request.body = .bytes(ByteBuffer(string: "{}"))
 
         let response = try await httpClient.execute(request, timeout: .seconds(30))
@@ -285,6 +304,7 @@ final class APNSTestServerValidationTests: XCTestCase {
     func testMethodNotAllowed_GET() async throws {
         var request = HTTPClientRequest(url: "http://127.0.0.1:\(server.port)/3/device/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
         request.method = .GET
+        request.headers.add(name: "authorization", value: "bearer \(makeTestJWT())")
 
         let response = try await httpClient.execute(request, timeout: .seconds(30))
         let bodyBuffer = try await response.body.collect(upTo: 1024 * 1024)
@@ -297,6 +317,7 @@ final class APNSTestServerValidationTests: XCTestCase {
     func testMethodNotAllowed_PUT() async throws {
         var request = HTTPClientRequest(url: "http://127.0.0.1:\(server.port)/3/device/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
         request.method = .PUT
+        request.headers.add(name: "authorization", value: "bearer \(makeTestJWT())")
 
         let response = try await httpClient.execute(request, timeout: .seconds(30))
         let bodyBuffer = try await response.body.collect(upTo: 1024 * 1024)
@@ -309,6 +330,7 @@ final class APNSTestServerValidationTests: XCTestCase {
     func testMethodNotAllowed_DELETE() async throws {
         var request = HTTPClientRequest(url: "http://127.0.0.1:\(server.port)/3/device/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
         request.method = .DELETE
+        request.headers.add(name: "authorization", value: "bearer \(makeTestJWT())")
 
         let response = try await httpClient.execute(request, timeout: .seconds(30))
         let bodyBuffer = try await response.body.collect(upTo: 1024 * 1024)
@@ -348,32 +370,44 @@ final class APNSTestServerValidationTests: XCTestCase {
         let bodyBuffer = try await response.body.collect(upTo: 1024 * 1024)
         let bodyString = bodyBuffer.getString(at: 0, length: bodyBuffer.readableBytes) ?? ""
 
-        // Wrong version falls through to generic NotFound (not /3/...)
+        // Wrong version falls through to the generic bad-path case (not /3/...)
         XCTAssertEqual(response.status, .notFound)
-        XCTAssertTrue(bodyString.contains("NotFound"))
+        XCTAssertTrue(bodyString.contains("BadPath"))
     }
 
     // MARK: - Valid Push Types Test
 
     func testValidPushTypes() async throws {
-        let validTypes = ["alert", "background", "location", "voip", "complication",
-                          "fileprovider", "mdm", "liveactivity", "pushtotalk", "widgets"]
+        // Each push type that enforces a topic suffix must be sent with a matching topic.
+        let topicByPushType: [String: String] = [
+            "alert": "com.example.app",
+            "background": "com.example.app",
+            "location": "com.example.app.location-query",
+            "voip": "com.example.app.voip",
+            "complication": "com.example.app.complication",
+            "fileprovider": "com.example.app.pushkit.fileprovider",
+            "mdm": "com.example.app",
+            "liveactivity": "com.example.app.push-type.liveactivity",
+            "pushtotalk": "com.example.app.voip-ptt",
+            "widgets": "com.example.app.push-type.widgets",
+            "controls": "com.example.app.push-type.controls",
+        ]
 
-        for pushType in validTypes {
+        for (pushType, topic) in topicByPushType {
             let response = try await sendRawNotification(
                 deviceToken: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-                topic: "com.example.app",
+                topic: topic,
                 pushType: pushType
             )
 
-            XCTAssertEqual(response.status, .ok, "Push type '\(pushType)' should be valid")
+            XCTAssertEqual(response.status, .ok, "Push type '\(pushType)' should be valid, got: \(response.body)")
         }
     }
 
     // MARK: - Valid Priorities Test
 
     func testValidPriorities() async throws {
-        for priority in ["5", "10"] {
+        for priority in ["1", "5", "10"] {
             let response = try await sendRawNotification(
                 deviceToken: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
                 topic: "com.example.app",
@@ -383,6 +417,183 @@ final class APNSTestServerValidationTests: XCTestCase {
 
             XCTAssertEqual(response.status, .ok, "Priority '\(priority)' should be valid")
         }
+
+        // `background` pushes must pair with priority 5 — priority 10 is rejected (BadPriority).
+        let backgroundResponse = try await sendRawNotification(
+            deviceToken: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            topic: "com.example.app",
+            pushType: "background",
+            priority: "5"
+        )
+        XCTAssertEqual(backgroundResponse.status, .ok)
+    }
+
+    // MARK: - Authorization Tests
+
+    func testMissingAuthorization_returnsMissingProviderToken() async throws {
+        let response = try await sendRawNotification(
+            deviceToken: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            topic: "com.example.app",
+            pushType: "alert",
+            authorization: nil
+        )
+
+        XCTAssertEqual(response.status, .forbidden)
+        XCTAssertTrue(response.body.contains("MissingProviderToken"))
+    }
+
+    func testGarbageAuthorization_returnsInvalidProviderToken() async throws {
+        let response = try await sendRawNotification(
+            deviceToken: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            topic: "com.example.app",
+            pushType: "alert",
+            authorization: "bearer not-a-real-token"
+        )
+
+        XCTAssertEqual(response.status, .forbidden)
+        XCTAssertTrue(response.body.contains("InvalidProviderToken"))
+    }
+
+    func testStringIatToken_returnsInvalidProviderToken() async throws {
+        // Pins the library-side fix: `iat` must be a JSON number, not a string (RFC 7519 NumericDate).
+        func base64url(_ string: String) -> String {
+            Data(string.utf8).base64EncodedString()
+                .replacingOccurrences(of: "+", with: "-")
+                .replacingOccurrences(of: "/", with: "_")
+                .replacingOccurrences(of: "=", with: "")
+        }
+        let header = base64url("{\"alg\":\"ES256\",\"typ\":\"JWT\",\"kid\":\"key\"}")
+        let payload = base64url("{\"iss\":\"team\",\"iat\":\"\(Int(Date().timeIntervalSince1970))\"}")
+        let token = "\(header).\(payload).\(base64url("sig"))"
+
+        let response = try await sendRawNotification(
+            deviceToken: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            topic: "com.example.app",
+            pushType: "alert",
+            authorization: "bearer \(token)"
+        )
+
+        XCTAssertEqual(response.status, .forbidden)
+        XCTAssertTrue(response.body.contains("InvalidProviderToken"))
+    }
+
+    func testExpiredIat_returnsExpiredProviderToken() async throws {
+        let response = try await sendRawNotification(
+            deviceToken: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            topic: "com.example.app",
+            pushType: "alert",
+            authorization: "bearer \(makeTestJWT(iatOffset: -3700))"
+        )
+
+        XCTAssertEqual(response.status, .forbidden)
+        XCTAssertTrue(response.body.contains("ExpiredProviderToken"))
+    }
+
+    // MARK: - Topic Suffix Enforcement
+
+    func testWrongTopicSuffix_voip_returnsBadTopic() async throws {
+        let response = try await sendRawNotification(
+            deviceToken: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            topic: "com.example.app",  // missing the required `.voip` suffix
+            pushType: "voip"
+        )
+
+        XCTAssertEqual(response.status, .badRequest)
+        XCTAssertTrue(response.body.contains("BadTopic"))
+    }
+
+    // MARK: - Background Priority
+
+    func testBackgroundWithPriority10_returnsBadPriority() async throws {
+        let response = try await sendRawNotification(
+            deviceToken: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            topic: "com.example.app",
+            pushType: "background",
+            priority: "10"
+        )
+
+        XCTAssertEqual(response.status, .badRequest)
+        XCTAssertTrue(response.body.contains("BadPriority"))
+    }
+
+    // MARK: - Per-Push-Type Payload Limits
+
+    func testVoIPPayload_5000Bytes_accepted() async throws {
+        let overhead = "{\"data\":\"\"}".utf8.count
+        let payload = "{\"data\":\"" + String(repeating: "x", count: 5000 - overhead) + "\"}"
+        XCTAssertEqual(payload.utf8.count, 5000)
+
+        let response = try await sendRawNotification(
+            deviceToken: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            topic: "com.example.app.voip",
+            pushType: "voip",
+            body: payload
+        )
+
+        XCTAssertEqual(response.status, .ok, "got: \(response.body)")
+    }
+
+    func testVoIPPayload_5200Bytes_rejected() async throws {
+        let overhead = "{\"data\":\"\"}".utf8.count
+        let payload = "{\"data\":\"" + String(repeating: "x", count: 5200 - overhead) + "\"}"
+        XCTAssertEqual(payload.utf8.count, 5200)
+
+        let response = try await sendRawNotification(
+            deviceToken: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            topic: "com.example.app.voip",
+            pushType: "voip",
+            body: payload
+        )
+
+        XCTAssertEqual(response.status, .badRequest)
+        XCTAssertTrue(response.body.contains("PayloadTooLarge"))
+    }
+
+    // MARK: - Malformed apns-id
+
+    func testMalformedAPNSID_returnsBadMessageId() async throws {
+        var request = HTTPClientRequest(url: "http://127.0.0.1:\(server.port)/3/device/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
+        request.method = .POST
+        request.headers.add(name: "apns-topic", value: "com.example.app")
+        request.headers.add(name: "apns-push-type", value: "alert")
+        request.headers.add(name: "apns-id", value: "not-a-uuid")
+        request.headers.add(name: "authorization", value: "bearer \(makeTestJWT())")
+        request.headers.add(name: "content-type", value: "application/json")
+        request.body = .bytes(ByteBuffer(string: "{}"))
+
+        let response = try await httpClient.execute(request, timeout: .seconds(30))
+        let bodyBuffer = try await response.body.collect(upTo: 1024 * 1024)
+        let bodyString = bodyBuffer.getString(at: 0, length: bodyBuffer.readableBytes) ?? ""
+
+        XCTAssertEqual(response.status, .badRequest)
+        XCTAssertTrue(bodyString.contains("BadMessageId"))
+    }
+
+    // MARK: - Response Override
+
+    func testResponseOverride_forcesStatus() async throws {
+        server.setResponseOverride(.init(status: 500, body: "{\"reason\":\"InternalServerError\"}"))
+
+        let response = try await sendRawNotification(
+            deviceToken: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            topic: "com.example.app",
+            pushType: "alert"
+        )
+
+        XCTAssertEqual(response.status, .internalServerError)
+        XCTAssertTrue(response.body.contains("InternalServerError"))
+        XCTAssertEqual(
+            server.getSentNotifications().count, 0,
+            "An overridden response must not be recorded as a sent notification"
+        )
+
+        // The override is consumed after a single use — the next request goes through normal handling.
+        let secondResponse = try await sendRawNotification(
+            deviceToken: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            topic: "com.example.app",
+            pushType: "alert"
+        )
+        XCTAssertEqual(secondResponse.status, .ok)
     }
 
     // MARK: - Helper Methods
@@ -394,7 +605,8 @@ final class APNSTestServerValidationTests: XCTestCase {
         priority: String? = nil,
         expiration: String? = nil,
         collapseID: String? = nil,
-        body: String? = "{}"
+        body: String? = "{}",
+        authorization: String? = "bearer \(makeTestJWT())"
     ) async throws -> (status: HTTPResponseStatus, body: String) {
         var request = HTTPClientRequest(url: "http://127.0.0.1:\(server.port)/3/device/\(deviceToken)")
         request.method = .POST
@@ -413,6 +625,9 @@ final class APNSTestServerValidationTests: XCTestCase {
         }
         if let collapseID = collapseID {
             request.headers.add(name: "apns-collapse-id", value: collapseID)
+        }
+        if let authorization = authorization {
+            request.headers.add(name: "authorization", value: authorization)
         }
 
         request.headers.add(name: "content-type", value: "application/json")

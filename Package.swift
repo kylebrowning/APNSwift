@@ -74,6 +74,7 @@ let package = Package(
                 .product(name: "NIOSSL", package: "swift-nio-ssl"),
                 .product(name: "NIOHTTP1", package: "swift-nio"),
                 .product(name: "NIOHTTP2", package: "swift-nio-http2"),
+                .product(name: "NIOConcurrencyHelpers", package: "swift-nio"),
             ]
         ),
         .target(

@@ -73,16 +73,19 @@ final class APNSAuthenticationTokenManagerTests: XCTestCase {
             string: String(splitToken[1]),
             options: [.base64UrlAlphabet, .omitPaddingCharacter]
         )
-        let payload = String(bytes: decodedPayload, encoding: .utf8)
-        let issuedAtTime = DispatchWallTime.now()
-        let expectedPayload = """
-        {
-            "iss": "foo",
-            "iat": "\(issuedAtTime.asSecondsSince1970)",
-            "kid": "bar"
+
+        // The expected `iat` is computed *after* token generation, so comparing raw strings
+        // is flaky across second boundaries. Instead, decode the JSON and assert `iss` plus
+        // an `iat` that's within a few seconds of "now".
+        struct Payload: Decodable {
+            let iss: String
+            let iat: Int64
         }
-        """
-        XCTAssertEqual(payload, expectedPayload)
+        let payload = try JSONDecoder().decode(Payload.self, from: Data(decodedPayload))
+        let now = Date().timeIntervalSince1970
+
+        XCTAssertEqual(payload.iss, "foo")
+        XCTAssertEqual(Double(payload.iat), now, accuracy: 5)
     }
     
         func testTokenIsReused() async throws {
@@ -140,7 +143,7 @@ final class APNSAuthenticationTokenManagerTests: XCTestCase {
 
         let payload = try decodeSegment(segments[1])
         XCTAssertTrue(payload.contains("\"iss\": \"foo\""))
-        XCTAssertTrue(payload.contains("\"kid\": \"bar\""))
+        XCTAssertFalse(payload.contains("\"kid\""), "kid must not be duplicated into the payload")
     }
 
     private func decodeSegment(_ segment: Substring) throws -> String {
