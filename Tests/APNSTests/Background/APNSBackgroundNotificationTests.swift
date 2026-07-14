@@ -38,7 +38,7 @@ final class APNSBackgroundNotificationTests: XCTestCase {
         XCTAssertEqual(jsonObject1, jsonObject2)
     }
 
-    func testEnode_whenAPSKeyInPayload() throws {
+    func testEncode_whenAPSKeyInPayload() throws {
         struct Payload: Encodable {
             let aps = "foo"
         }
