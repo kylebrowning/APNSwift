@@ -100,11 +100,12 @@ public final actor APNSAuthenticationTokenManager<Clock: _Concurrency.Clock> whe
         """
 
         let issueAtTime = DispatchWallTime.now()
+        // `iat` is a JWT NumericDate (RFC 7519) and MUST be emitted as a JSON number, not a string.
+        // `kid` belongs only in the header (RFC 7515 / Apple's docs) and must not be duplicated here.
         let payload = """
         {
             "iss": "\(teamIdentifier)",
-            "iat": "\(issueAtTime.asSecondsSince1970)",
-            "kid": "\(keyIdentifier)"
+            "iat": \(issueAtTime.asSecondsSince1970)
         }
         """
 

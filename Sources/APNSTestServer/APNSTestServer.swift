@@ -15,10 +15,13 @@
 import NIOCore
 import NIOPosix
 import NIOHTTP1
+import NIOConcurrencyHelpers
 import struct Foundation.UUID
 import struct Foundation.Data
+import struct Foundation.Date
 import class Foundation.JSONSerialization
 import class Foundation.JSONDecoder
+import class Foundation.NSNumber
 import struct Foundation.CharacterSet
 
 /// A comprehensive mock server that simulates Apple Push Notification service APIs.
@@ -48,8 +51,10 @@ import struct Foundation.CharacterSet
 public final class APNSTestServer: @unchecked Sendable {
     private let group: EventLoopGroup
     private var channel: Channel?
-    private var broadcastChannels: [String: MockBroadcastChannel] = [:]
-    private var sentNotifications: [SentNotification] = []
+    private let broadcastChannelsBox = NIOLockedValueBox<[String: MockBroadcastChannel]>([:])
+    private let sentNotificationsBox = NIOLockedValueBox<[SentNotification]>([])
+    private let broadcastRequestsBox = NIOLockedValueBox<[BroadcastRequestRecord]>([])
+    private let responseOverrideBox = NIOLockedValueBox<ResponseOverride?>(nil)
 
     public var port: Int {
         guard let channel = channel else {
@@ -74,6 +79,36 @@ public final class APNSTestServer: @unchecked Sendable {
         }
     }
 
+    /// Metadata captured about a request made to a broadcast/channel management endpoint,
+    /// so tests can assert what the client actually sent (independent of what the server decided to do with it).
+    public struct BroadcastRequestRecord: Sendable {
+        /// The raw request URI, e.g. `/1/apps/com.example.app/channels`.
+        public let path: String
+        /// The HTTP method, e.g. `"POST"`, `"GET"`, `"DELETE"`.
+        public let method: String
+        /// The `apns-request-id` header the client sent, if any.
+        public let apnsRequestID: String?
+        /// The `apns-channel-id` header the client sent, if any.
+        public let apnsChannelID: String?
+    }
+
+    /// A forced response for the *next* `/3/device/{token}` request, letting tests simulate
+    /// server-side failures (500/503/429) or malformed bodies without the mock server's usual validation.
+    public struct ResponseOverride: Sendable {
+        /// The HTTP status code to respond with.
+        public var status: UInt
+        /// The raw response body. Defaults to an empty body.
+        public var body: String?
+        /// Additional response headers.
+        public var headers: [(String, String)]
+
+        public init(status: UInt, body: String? = nil, headers: [(String, String)] = []) {
+            self.status = status
+            self.body = body
+            self.headers = headers
+        }
+    }
+
     struct MockBroadcastChannel: Codable {
         let channelID: String
         let messageStoragePolicy: Int
@@ -91,6 +126,23 @@ public final class APNSTestServer: @unchecked Sendable {
 
     /// The `timestamp` (milliseconds since epoch) returned alongside a simulated `410 Unregistered` response.
     public static let unregisteredTimestampMilliseconds = 1_454_096_879_000
+
+    /// Push types that require the `apns-topic` header to end with a specific suffix.
+    private static let topicSuffixRequirements: [String: String] = [
+        "voip": ".voip",
+        "pushtotalk": ".voip-ptt",
+        "complication": ".complication",
+        "fileprovider": ".pushkit.fileprovider",
+        "liveactivity": ".push-type.liveactivity",
+        "location": ".location-query",
+        "widgets": ".push-type.widgets",
+        "controls": ".push-type.controls",
+    ]
+
+    private static let validPushTypes: Set<String> = [
+        "alert", "background", "location", "voip", "complication",
+        "fileprovider", "mdm", "liveactivity", "pushtotalk", "widgets", "controls",
+    ]
 
     public init() {
         self.group = MultiThreadedEventLoopGroup(numberOfThreads: 1)
@@ -124,13 +176,108 @@ public final class APNSTestServer: @unchecked Sendable {
 
     /// Returns all notifications sent to this server.
     public func getSentNotifications() -> [SentNotification] {
-        return sentNotifications
+        sentNotificationsBox.withLockedValue { $0 }
     }
 
     /// Clears all sent notifications.
     public func clearSentNotifications() {
-        sentNotifications.removeAll()
+        sentNotificationsBox.withLockedValue { $0.removeAll() }
     }
+
+    /// Returns all requests made to broadcast/channel management endpoints.
+    public func getBroadcastRequests() -> [BroadcastRequestRecord] {
+        broadcastRequestsBox.withLockedValue { $0 }
+    }
+
+    /// Forces the *next* `/3/device/{token}` response to be exactly `override`, bypassing all normal
+    /// validation. The override is consumed (cleared) after a single use. Pass `nil` to clear it without use.
+    public func setResponseOverride(_ override: ResponseOverride?) {
+        responseOverrideBox.withLockedValue { $0 = override }
+    }
+
+    private func takeResponseOverride() -> ResponseOverride? {
+        responseOverrideBox.withLockedValue { value in
+            defer { value = nil }
+            return value
+        }
+    }
+
+    // MARK: - Authorization
+
+    private struct AuthFailure {
+        let status: HTTPResponseStatus
+        let reason: String
+    }
+
+    /// Restores base64url padding and decodes to `Data`. The server never verifies the ES256
+    /// signature (it has no public key) — it only validates structure and claims.
+    private static func base64URLDecode(_ segment: Substring) -> Data? {
+        var characters = Array(segment)
+        for index in characters.indices {
+            if characters[index] == "-" {
+                characters[index] = "+"
+            } else if characters[index] == "_" {
+                characters[index] = "/"
+            }
+        }
+        var base64 = String(characters)
+        let remainder = base64.count % 4
+        if remainder > 0 {
+            base64.append(contentsOf: String(repeating: "=", count: 4 - remainder))
+        }
+        return Data(base64Encoded: base64)
+    }
+
+    /// Validates the `authorization` header of a device-push or broadcast/channel request.
+    ///
+    /// Order matches Apple's own precedence: missing/malformed scheme first, then structural/claim
+    /// issues, then expiry. The ES256 signature itself is never checked.
+    private static func validateAuthorization(headers: HTTPHeaders) -> AuthFailure? {
+        guard let authHeader = headers.first(name: "authorization") else {
+            return AuthFailure(status: .forbidden, reason: "MissingProviderToken")
+        }
+
+        let schemeAndToken = authHeader.split(separator: " ", maxSplits: 1, omittingEmptySubsequences: true)
+        guard schemeAndToken.count == 2, schemeAndToken[0].lowercased() == "bearer" else {
+            return AuthFailure(status: .forbidden, reason: "MissingProviderToken")
+        }
+
+        let token = schemeAndToken[1]
+        let segments = token.split(separator: ".", omittingEmptySubsequences: false)
+        guard segments.count == 3 else {
+            return AuthFailure(status: .forbidden, reason: "InvalidProviderToken")
+        }
+
+        guard let headerData = base64URLDecode(segments[0]),
+              let headerJSON = try? JSONSerialization.jsonObject(with: headerData) as? [String: Any],
+              let alg = headerJSON["alg"] as? String, alg == "ES256",
+              headerJSON["kid"] != nil
+        else {
+            return AuthFailure(status: .forbidden, reason: "InvalidProviderToken")
+        }
+
+        guard let payloadData = base64URLDecode(segments[1]),
+              let payloadJSON = try? JSONSerialization.jsonObject(with: payloadData) as? [String: Any],
+              payloadJSON["iss"] != nil
+        else {
+            return AuthFailure(status: .forbidden, reason: "InvalidProviderToken")
+        }
+
+        // A string `iat` (e.g. the pre-fix library bug) must be rejected as invalid, not merely expired.
+        guard let iatNumber = payloadJSON["iat"] as? NSNumber else {
+            return AuthFailure(status: .forbidden, reason: "InvalidProviderToken")
+        }
+
+        let iatSeconds = iatNumber.doubleValue
+        let nowSeconds = Date().timeIntervalSince1970
+        if nowSeconds - iatSeconds > 3600 {
+            return AuthFailure(status: .forbidden, reason: "ExpiredProviderToken")
+        }
+
+        return nil
+    }
+
+    // MARK: - Request dispatch
 
     fileprivate func handleRequest(
         method: HTTPMethod,
@@ -141,34 +288,115 @@ public final class APNSTestServer: @unchecked Sendable {
         // Parse the URI
         let components = uri.split(separator: "/")
 
+        let isAppsPath = components.count >= 2 && components[0] == "1" && components[1] == "apps"
+        let isDevicePushAttempt = components.count >= 2 && components[0] == "3" && components[1] == "device"
+
+        if isAppsPath {
+            recordBroadcastRequest(uri: uri, method: method, headers: headers)
+        }
+
+        // Authorization is validated before all other request validation on device-push and
+        // broadcast/channel endpoints.
+        if isAppsPath || isDevicePushAttempt {
+            if let failure = Self.validateAuthorization(headers: headers) {
+                var responseHeaders = HTTPHeaders()
+                responseHeaders.add(name: "content-type", value: "application/json")
+                let result = (failure.status, responseHeaders, "{\"reason\":\"\(failure.reason)\"}")
+                return finalize(result, isDevicePush: isDevicePushAttempt, isBroadcast: isAppsPath, requestHeaders: headers)
+            }
+        }
+
+        let result = dispatch(method: method, components: components, headers: headers, body: body)
+        return finalize(result, isDevicePush: isDevicePushAttempt, isBroadcast: isAppsPath, requestHeaders: headers)
+    }
+
+    /// Adds the response headers that are consistent across an entire path family
+    /// (`apns-unique-id` for device pushes, `apns-request-id` for broadcast/channel operations).
+    private func finalize(
+        _ result: (status: HTTPResponseStatus, headers: HTTPHeaders, body: String),
+        isDevicePush: Bool,
+        isBroadcast: Bool,
+        requestHeaders: HTTPHeaders
+    ) -> (status: HTTPResponseStatus, headers: HTTPHeaders, body: String) {
+        var responseHeaders = result.headers
+
+        if isDevicePush && !responseHeaders.contains(name: "apns-unique-id") {
+            responseHeaders.add(name: "apns-unique-id", value: UUID().uuidString)
+        }
+
+        if isBroadcast && !responseHeaders.contains(name: "apns-request-id") {
+            let requestID = requestHeaders.first(name: "apns-request-id") ?? UUID().uuidString
+            responseHeaders.add(name: "apns-request-id", value: requestID)
+        }
+
+        return (result.status, responseHeaders, result.body)
+    }
+
+    private func recordBroadcastRequest(uri: String, method: HTTPMethod, headers: HTTPHeaders) {
+        let record = BroadcastRequestRecord(
+            path: uri,
+            method: String(describing: method),
+            apnsRequestID: headers.first(name: "apns-request-id"),
+            apnsChannelID: headers.first(name: "apns-channel-id")
+        )
+        broadcastRequestsBox.withLockedValue { $0.append(record) }
+    }
+
+    private func dispatch(
+        method: HTTPMethod,
+        components: [Substring],
+        headers: HTTPHeaders,
+        body: ByteBuffer?
+    ) -> (status: HTTPResponseStatus, headers: HTTPHeaders, body: String) {
+        let isAppsPath = components.count >= 2 && components[0] == "1" && components[1] == "apps"
+        let isChannelsPath = isAppsPath && components.count == 4 && components[3] == "channels"
+        let isAllChannelsPath = isAppsPath && components.count == 4 && components[3] == "all-channels"
+
         // Broadcast channel endpoints: /1/apps/{bundleID}/channels
         // Channel ID is passed via apns-channel-id header for read/delete operations
+        if isChannelsPath {
+            switch method {
+            case .POST:
+                return handleCreateChannel(body: body)
+
+            case .GET:
+                // Reading a single channel requires the channel ID header. Unlike the real
+                // APNs API, `GET .../channels` without an ID is NOT the list endpoint
+                // (that lives at `.../all-channels`), so reject it rather than silently listing.
+                guard let channelID = headers.first(name: "apns-channel-id") else {
+                    var responseHeaders = HTTPHeaders()
+                    responseHeaders.add(name: "content-type", value: "application/json")
+                    return (.badRequest, responseHeaders, "{\"reason\":\"MissingChannelId\"}")
+                }
+                return handleReadChannel(channelID: channelID)
+
+            case .DELETE:
+                guard let channelID = headers.first(name: "apns-channel-id") else {
+                    var responseHeaders = HTTPHeaders()
+                    responseHeaders.add(name: "content-type", value: "application/json")
+                    return (.badRequest, responseHeaders, "{\"reason\":\"MissingChannelId\"}")
+                }
+                return handleDeleteChannel(channelID: channelID)
+
+            default:
+                var responseHeaders = HTTPHeaders()
+                responseHeaders.add(name: "content-type", value: "application/json")
+                return (.methodNotAllowed, responseHeaders, "{\"reason\":\"MethodNotAllowed\"}")
+            }
+        }
+
+        if isAllChannelsPath {
+            switch method {
+            case .GET:
+                return handleListChannels()
+            default:
+                var responseHeaders = HTTPHeaders()
+                responseHeaders.add(name: "content-type", value: "application/json")
+                return (.methodNotAllowed, responseHeaders, "{\"reason\":\"MethodNotAllowed\"}")
+            }
+        }
+
         switch (method, components.count) {
-        case (.POST, 4) where components[0] == "1" && components[1] == "apps" && components[3] == "channels":
-            return handleCreateChannel(body: body)
-
-        case (.GET, 4) where components[0] == "1" && components[1] == "apps" && components[3] == "all-channels":
-            return handleListChannels()
-
-        case (.GET, 4) where components[0] == "1" && components[1] == "apps" && components[3] == "channels":
-            // Reading a single channel requires the channel ID header. Unlike the real
-            // APNs API, `GET .../channels` without an ID is NOT the list endpoint
-            // (that lives at `.../all-channels`), so reject it rather than silently listing.
-            guard let channelID = headers.first(name: "apns-channel-id") else {
-                var responseHeaders = HTTPHeaders()
-                responseHeaders.add(name: "content-type", value: "application/json")
-                return (.badRequest, responseHeaders, "{\"reason\":\"MissingChannelID\"}")
-            }
-            return handleReadChannel(channelID: channelID)
-
-        case (.DELETE, 4) where components[0] == "1" && components[1] == "apps" && components[3] == "channels":
-            guard let channelID = headers.first(name: "apns-channel-id") else {
-                var responseHeaders = HTTPHeaders()
-                responseHeaders.add(name: "content-type", value: "application/json")
-                return (.badRequest, responseHeaders, "{\"reason\":\"MissingChannelID\"}")
-            }
-            return handleDeleteChannel(channelID: channelID)
-
         // Regular push notification endpoint: POST /3/device/{token}
         case (.POST, 3) where components[0] == "3" && components[1] == "device":
             let deviceToken = String(components[2])
@@ -195,7 +423,7 @@ public final class APNSTestServer: @unchecked Sendable {
         default:
             var responseHeaders = HTTPHeaders()
             responseHeaders.add(name: "content-type", value: "application/json")
-            return (.notFound, responseHeaders, "{\"reason\":\"NotFound\"}")
+            return (.notFound, responseHeaders, "{\"reason\":\"BadPath\"}")
         }
     }
 
@@ -225,15 +453,15 @@ public final class APNSTestServer: @unchecked Sendable {
 
         let channelID = UUID().uuidString
         let channel = MockBroadcastChannel(channelID: channelID, messageStoragePolicy: policy, pushType: pushType)
-        broadcastChannels[channelID] = channel
+        broadcastChannelsBox.withLockedValue { $0[channelID] = channel }
 
         var headers = HTTPHeaders()
         headers.add(name: "apns-channel-id", value: channelID)
-        return (.ok, headers, "")
+        return (.created, headers, "")
     }
 
     private func handleListChannels() -> (status: HTTPResponseStatus, headers: HTTPHeaders, body: String) {
-        let channelIDs = Array(broadcastChannels.keys)
+        let channelIDs = broadcastChannelsBox.withLockedValue { Array($0.keys) }
         let channelsJSON = channelIDs.map { "\"\($0)\"" }.joined(separator: ",")
 
         var headers = HTTPHeaders()
@@ -246,7 +474,7 @@ public final class APNSTestServer: @unchecked Sendable {
         var headers = HTTPHeaders()
         headers.add(name: "content-type", value: "application/json")
 
-        guard let channel = broadcastChannels[channelID] else {
+        guard let channel = broadcastChannelsBox.withLockedValue({ $0[channelID] }) else {
             return (.notFound, headers, "{\"reason\":\"NotFound\"}")
         }
 
@@ -259,7 +487,7 @@ public final class APNSTestServer: @unchecked Sendable {
     private func handleDeleteChannel(channelID: String) -> (status: HTTPResponseStatus, headers: HTTPHeaders, body: String) {
         var headers = HTTPHeaders()
 
-        guard broadcastChannels.removeValue(forKey: channelID) != nil else {
+        guard broadcastChannelsBox.withLockedValue({ $0.removeValue(forKey: channelID) }) != nil else {
             headers.add(name: "content-type", value: "application/json")
             return (.notFound, headers, "{\"reason\":\"NotFound\"}")
         }
@@ -274,6 +502,18 @@ public final class APNSTestServer: @unchecked Sendable {
         headers: HTTPHeaders,
         body: ByteBuffer?
     ) -> (status: HTTPResponseStatus, headers: HTTPHeaders, body: String) {
+        // A test-forced response bypasses all normal validation and isn't recorded as a sent notification.
+        if let override = takeResponseOverride() {
+            var responseHeaders = HTTPHeaders()
+            for (name, value) in override.headers {
+                responseHeaders.add(name: name, value: value)
+            }
+            if !responseHeaders.contains(name: "content-type") {
+                responseHeaders.add(name: "content-type", value: "application/json")
+            }
+            return (HTTPResponseStatus(statusCode: Int(override.status)), responseHeaders, override.body ?? "")
+        }
+
         // Validate device token (Apple requires exactly 64 hexadecimal characters)
         let isValidHex = deviceToken.count == 64 && deviceToken.allSatisfy { $0.isHexDigit }
         if !isValidHex {
@@ -292,26 +532,50 @@ public final class APNSTestServer: @unchecked Sendable {
         }
 
         // Validate required topic header
-        guard headers.contains(name: "apns-topic") else {
+        guard let topic = headers.first(name: "apns-topic") else {
             var responseHeaders = HTTPHeaders()
             responseHeaders.add(name: "content-type", value: "application/json")
             return (.badRequest, responseHeaders, "{\"reason\":\"MissingTopic\"}")
         }
 
+        // Validate apns-id if present: malformed values are rejected outright rather than silently
+        // replaced, matching Apple's `BadMessageId`.
+        var apnsID = UUID()
+        if let apnsIDHeader = headers.first(name: "apns-id") {
+            guard let parsedID = UUID(uuidString: apnsIDHeader) else {
+                var responseHeaders = HTTPHeaders()
+                responseHeaders.add(name: "content-type", value: "application/json")
+                return (.badRequest, responseHeaders, "{\"reason\":\"BadMessageId\"}")
+            }
+            apnsID = parsedID
+        }
+
         // Validate push type if present
-        if let pushType = headers.first(name: "apns-push-type") {
-            let validPushTypes = ["alert", "background", "location", "voip", "complication",
-                                  "fileprovider", "mdm", "liveactivity", "pushtotalk", "widgets"]
-            if !validPushTypes.contains(pushType) {
+        let pushType = headers.first(name: "apns-push-type")
+        if let pushType = pushType {
+            guard Self.validPushTypes.contains(pushType) else {
                 var responseHeaders = HTTPHeaders()
                 responseHeaders.add(name: "content-type", value: "application/json")
                 return (.badRequest, responseHeaders, "{\"reason\":\"InvalidPushType\"}")
+            }
+
+            if let requiredSuffix = Self.topicSuffixRequirements[pushType], !topic.hasSuffix(requiredSuffix) {
+                var responseHeaders = HTTPHeaders()
+                responseHeaders.add(name: "content-type", value: "application/json")
+                return (.badRequest, responseHeaders, "{\"reason\":\"BadTopic\"}")
             }
         }
 
         // Validate priority if present
         if let priority = headers.first(name: "apns-priority") {
-            if priority != "5" && priority != "10" {
+            guard priority == "1" || priority == "5" || priority == "10" else {
+                var responseHeaders = HTTPHeaders()
+                responseHeaders.add(name: "content-type", value: "application/json")
+                return (.badRequest, responseHeaders, "{\"reason\":\"BadPriority\"}")
+            }
+
+            // Apple rejects `background` pushes sent with immediate (10) priority.
+            if priority == "10" && pushType == "background" {
                 var responseHeaders = HTTPHeaders()
                 responseHeaders.add(name: "content-type", value: "application/json")
                 return (.badRequest, responseHeaders, "{\"reason\":\"BadPriority\"}")
@@ -351,8 +615,9 @@ public final class APNSTestServer: @unchecked Sendable {
 
         let payload = Data(bytes)
 
-        // Validate payload size (Apple's limit is 4KB for most notifications)
-        if payload.count > 4096 {
+        // Validate payload size. Apple's limit is 4KB for most notifications, but VoIP pushes get 5KB.
+        let payloadLimit = pushType == "voip" ? 5120 : 4096
+        if payload.count > payloadLimit {
             var responseHeaders = HTTPHeaders()
             responseHeaders.add(name: "content-type", value: "application/json")
             return (.badRequest, responseHeaders, "{\"reason\":\"PayloadTooLarge\"}")
@@ -365,13 +630,10 @@ public final class APNSTestServer: @unchecked Sendable {
             return (.badRequest, responseHeaders, "{\"reason\":\"PayloadEmpty\"}")
         }
 
-        // Extract headers
-        let pushType = headers.first(name: "apns-push-type")
-        let topic = headers.first(name: "apns-topic")
+        // Extract remaining headers
         let priority = headers.first(name: "apns-priority")
         let expiration = headers.first(name: "apns-expiration")
         let collapseID = headers.first(name: "apns-collapse-id")
-        let apnsID = headers.first(name: "apns-id").flatMap { UUID(uuidString: $0) } ?? UUID()
 
         // Store the notification
         let notification = SentNotification(
@@ -384,7 +646,7 @@ public final class APNSTestServer: @unchecked Sendable {
             apnsID: apnsID,
             payload: payload
         )
-        sentNotifications.append(notification)
+        sentNotificationsBox.withLockedValue { $0.append(notification) }
 
         // Return success
         var responseHeaders = HTTPHeaders()
@@ -441,9 +703,6 @@ private final class APNSRequestHandler: ChannelInboundHandler {
             )
 
             var finalHeaders = responseHeaders
-            if !finalHeaders.contains(name: "apns-request-id") {
-                finalHeaders.add(name: "apns-request-id", value: UUID().uuidString)
-            }
             finalHeaders.add(name: "content-length", value: String(body.utf8.count))
 
             let responseHead = HTTPResponseHead(version: .http1_1, status: status, headers: finalHeaders)

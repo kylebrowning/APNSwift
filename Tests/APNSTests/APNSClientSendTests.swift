@@ -57,6 +57,8 @@ final class APNSClientSendTests: XCTestCase {
         let response = try await client.sendAlertNotification(Self.makeAlert(), deviceToken: Self.validDeviceToken)
 
         XCTAssertNotNil(response.apnsID)
+        // The mock server simulates the development environment, which always returns apns-unique-id.
+        XCTAssertNotNil(response.apnsUniqueID)
         XCTAssertEqual(server.getSentNotifications().count, 1)
     }
 
