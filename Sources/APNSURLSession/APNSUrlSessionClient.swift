@@ -65,6 +65,55 @@ public struct APNSURLSessionClient: APNSClientProtocol {
         )
     }
 
+    /// Publishes a broadcast push notification.
+    ///
+    /// Broadcast pushes are sent to the regular device-push host (``APNSEnvironment``), not the
+    /// channel-management host, and are Live Activities only.
+    ///
+    /// - Parameter request: The broadcast send request.
+    public func sendBroadcast<Message: APNSMessage>(
+        _ request: APNSBroadcastSendRequest<Message>
+    ) async throws -> APNSBroadcastSendResponse {
+
+        /// Construct URL
+        var urlRequest = URLRequest(url: URL(string: configuration.environment.broadcastSendURL(bundleID: request.bundleID))!)
+        urlRequest.httpMethod = "POST"
+        /// Set headers
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        for (header, value) in request.headers {
+            urlRequest.setValue(value, forHTTPHeaderField: header)
+        }
+
+        await urlRequest.setValue(try configuration.nextValidToken(), forHTTPHeaderField: "Authorization")
+
+        /// Set Body
+        urlRequest.httpBody = try encoder.encode(request.message)
+
+        /// Make request
+        let (data, response) = try await URLSession.shared.data(for: urlRequest)
+
+        /// Unwrap response
+        guard let response = response as? HTTPURLResponse else {
+            throw APNSUrlSessionClientError.urlResponseNotFound
+        }
+
+        let apnsRequestID = response.value(forHTTPHeaderField: "apns-request-id").flatMap { UUID(uuidString: $0) }
+        let apnsUniqueID = response.value(forHTTPHeaderField: "apns-unique-id").flatMap { UUID(uuidString: $0) }
+
+        if response.statusCode == 200 {
+            return APNSBroadcastSendResponse(apnsRequestID: apnsRequestID, apnsUniqueID: apnsUniqueID)
+        }
+
+        let errorResponse = try? decoder.decode(APNSErrorResponse.self, from: data)
+        throw APNSError(
+            responseStatus: response.statusCode,
+            apnsID: nil,
+            apnsUniqueID: apnsUniqueID,
+            apnsResponse: errorResponse,
+            timestamp: errorResponse?.timestampInSeconds.flatMap { Date(timeIntervalSince1970: $0) }
+        )
+    }
+
     public func shutdown() async throws {
         // no op
     }
