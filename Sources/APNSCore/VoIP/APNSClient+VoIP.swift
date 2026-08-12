@@ -22,8 +22,6 @@ extension APNSClientProtocol {
     ///   - deviceToken: The hexadecimal bytes that identify the user’s device. Your app receives the bytes for this device token
     ///    when registering for remote notifications.
     ///
-    ///
-    ///   - logger: The logger to use for sending this notification.
     @discardableResult
     @inlinable
     public func sendVoIPNotification<Payload: Encodable & Sendable>(

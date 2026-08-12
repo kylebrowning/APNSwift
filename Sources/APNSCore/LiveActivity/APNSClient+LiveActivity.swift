@@ -21,8 +21,6 @@ extension APNSClientProtocol {
     ///   - deviceToken: The hexadecimal bytes use to send live activity notification. Your app receives the bytes for this activity token
     ///    from `pushTokenUpdates` async property of a live activity.
     ///
-    ///
-    ///   - logger: The logger to use for sending this notification.
     @discardableResult
     @inlinable
     public func sendLiveActivityNotification<ContentState: Encodable>(

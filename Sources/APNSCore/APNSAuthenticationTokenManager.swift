@@ -48,8 +48,7 @@ public final actor APNSAuthenticationTokenManager<Clock: _Concurrency.Clock> whe
     ///   - privateKey: The private key used for signing the tokens.
     ///   - teamIdentifier: The private key's team identifier.
     ///   - keyIdentifier: The private key's identifier.
-    ///   - logger: The logger.
-    ///   - currentTimeFactory: A closure to get the current time.
+    ///   - clock: The clock used to determine when a generated token has expired.
     public init(
         privateKey: P256.Signing.PrivateKey,
         teamIdentifier: String,
