@@ -1,6 +1,6 @@
-[![sswg:graduated|94x20](https://img.shields.io/badge/sswg-graduated-green.svg)]([https://github.com/swift-server/sswg/blob/master/process/incubation.md#sandbox-level](https://www.swift.org/sswg/incubation-process.html#graduation-requirements))
+[![sswg:graduated|94x20](https://img.shields.io/badge/sswg-graduated-green.svg)](https://www.swift.org/sswg/incubation-process.html#graduation-requirements)
 [![Build](https://github.com/kylebrowning/APNSwift/workflows/test/badge.svg)](https://github.com/kylebrowning/APNSwift/actions)
-[![Documentation](https://img.shields.io/badge/documentation-blueviolet.svg)](https://swiftpackageindex.com/swift-server-community/APNSwift/documentation)
+[![Documentation](https://img.shields.io/badge/documentation-blueviolet.svg)](https://swiftpackageindex.com/kylebrowning/APNSwift/documentation)
 [![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fkylebrowning%2FAPNSwift%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/kylebrowning/APNSwift)<br>
 [![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Fkylebrowning%2FAPNSwift%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/kylebrowning/APNSwift)
 <h1> APNSwift</h1>
@@ -25,12 +25,12 @@ To install `APNSwift`, just add the package as a dependency in your [**Package.s
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/swift-server-community/APNSwift.git", from: "6.0.0"),
+    .package(url: "https://github.com/kylebrowning/APNSwift.git", from: "7.0.0"),
 ]
 ```
 
 ## Getting Started
-APNSwift aims to provide semantically correct structures to sending push notifications. You first need to setup a [`APNSClient`](https://github.com/swift-server-community/APNSwift/blob/main/Sources/APNS/APNSClient.swift). To do that youll need to know your authentication method 
+APNSwift aims to provide semantically correct structures to sending push notifications. You first need to setup a [`APNSClient`](https://github.com/kylebrowning/APNSwift/blob/main/Sources/APNS/APNSClient.swift). To do that youll need to know your authentication method 
 
 ```swift
 let client = APNSClient(
@@ -153,7 +153,7 @@ This logger can be passed into the `APNSClient` and will log background things l
 This logger can be passed into any of the `send:` methods and will log everything related to a single send request. 
 
 ## Server Example
-Take a look at [Program.swift](https://github.com/swift-server-community/APNSwift/blob/main/Sources/APNSExample/Program.swift)
+Take a look at [Program.swift](https://github.com/kylebrowning/APNSwift/blob/main/Sources/APNSExample/Program.swift)
 
 ## iOS Example
 
@@ -165,4 +165,4 @@ Once inside configure your App Bundle ID and assign your development team. Build
 
 * Pitch discussion: [Swift Server Forums](https://forums.swift.org/t/apple-push-notification-service-implementation-pitch/20193)
 * Proposal: [SSWG-0006](https://forums.swift.org/t/feedback-nioapns-nio-based-apple-push-notification-service/24393)
-* 5.0 breaking changings: [Swift Server Forums]([Blog post here on breaking changing](https://forums.swift.org/t/apnswift-5-0-0-beta-release/60075/3))
+* 5.0 breaking changes: [Swift Server Forums](https://forums.swift.org/t/apnswift-5-0-0-beta-release/60075/3)

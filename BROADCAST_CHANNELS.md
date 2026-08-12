@@ -166,5 +166,5 @@ swift test --filter APNSBroadcastClientTests
 ## References
 
 - [Apple Push Notification service documentation](https://developer.apple.com/documentation/usernotifications)
-- Issue: https://github.com/swift-server-community/APNSwift/issues/205
+- Issue: https://github.com/kylebrowning/APNSwift/issues/205
 - Original WIP branch: https://github.com/eliperkins/APNSwift/tree/channels
