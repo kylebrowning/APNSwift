@@ -2,6 +2,12 @@ name: test
 on:
 - pull_request
 jobs:
+  foundation-linking:
+    uses: vapor/ci/.github/workflows/check-foundation-linking.yml@main
+    permissions:
+      contents: read
+    with:
+      excluded_products: 'APNSURLSession APNSTestServer'
   focal:
     container:
       image: swift:6.2-bookworm
