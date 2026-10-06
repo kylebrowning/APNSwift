@@ -27,6 +27,7 @@ public struct APNSPushType: Hashable, Sendable, CustomStringConvertible {
         case pushtotalk
         case widgets
         case controls
+        case accessory
     }
     
     public var description: String {
@@ -122,4 +123,14 @@ public struct APNSPushType: Hashable, Sendable, CustomStringConvertible {
     /// - Important: if you set this push type, the topic must use your app’s bundle ID with `.push-type.controls` appended to the end.
     ///
     public static let controls = Self(configuration: .controls)
+
+    /// Use the accessory push type to send an accessory's response to a notification it received
+    /// through AccessoryNotifications' Internet transport back to the iPhone.
+    ///
+    /// The payload is defined by the accessory and encrypted for it; the system decrypts it and hands it to
+    /// the companion app's data provider extension.
+    ///
+    /// - Important: If you set this push type, the topic must use your companion app’s bundle ID with
+    /// `.push-type.accessory` appended to the end.
+    public static let accessory = Self(configuration: .accessory)
 }
