@@ -128,7 +128,7 @@ public final class APNSBroadcastClient<Decoder: APNSJSONDecoder & Sendable, Enco
     }
 }
 
-extension APNSBroadcastClient: Sendable where Decoder: Sendable, Encoder: Sendable {}
+extension APNSBroadcastClient: Sendable {}
 
 // MARK: - Broadcast operations
 
