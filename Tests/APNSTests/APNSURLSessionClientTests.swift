@@ -19,6 +19,38 @@ import APNSTestServer
 import Crypto
 import XCTest
 
+/// Intercepts every request made through a `URLSession` configured with it and answers `200 {}`.
+final class RecordingURLProtocol: URLProtocol {
+    nonisolated(unsafe) private static var _lastRequest: URLRequest?
+    private static let lock = NSLock()
+
+    static var lastRequest: URLRequest? {
+        lock.withLock { _lastRequest }
+    }
+
+    static func reset() {
+        lock.withLock { _lastRequest = nil }
+    }
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        Self.lock.withLock { Self._lastRequest = request }
+        let response = HTTPURLResponse(
+            url: request.url!,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: ["apns-request-id": UUID().uuidString]
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data("{}".utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
+
 final class APNSURLSessionClientTests: XCTestCase {
     var server: APNSTestServer!
     var client: APNSURLSessionClient!
@@ -198,6 +230,66 @@ final class APNSURLSessionClientTests: XCTestCase {
         )
 
         XCTAssertNotNil(response.apnsID)
+    }
+
+    func testSendAlert_forced500EmptyBody_yieldsTypedErrorWithNilReason() async throws {
+        server.setResponseOverride(.init(status: 500))
+
+        do {
+            _ = try await client.sendAlertNotification(Self.makeAlert(), deviceToken: Self.validDeviceToken)
+            XCTFail("Expected an APNSError to be thrown")
+        } catch let error as APNSError {
+            XCTAssertEqual(error.responseStatus, 500)
+            XCTAssertNil(error.reason)
+        } catch {
+            XCTFail("Expected an APNSError, got \(type(of: error)): \(error)")
+        }
+    }
+
+    func testSendAlert_forced503NonJSONBody_yieldsTypedErrorWithNilReason() async throws {
+        server.setResponseOverride(.init(status: 503, body: "<html>unavailable</html>"))
+
+        do {
+            _ = try await client.sendAlertNotification(Self.makeAlert(), deviceToken: Self.validDeviceToken)
+            XCTFail("Expected an APNSError to be thrown")
+        } catch let error as APNSError {
+            XCTAssertEqual(error.responseStatus, 503)
+            XCTAssertNil(error.reason)
+        } catch {
+            XCTFail("Expected an APNSError, got \(type(of: error)): \(error)")
+        }
+    }
+
+    func testSendBroadcast_usesInjectedSession() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [RecordingURLProtocol.self]
+        let customClient = APNSURLSessionClient(
+            configuration: .init(
+                environment: .custom(url: "http://127.0.0.1", port: server.port),
+                privateKey: try P256.Signing.PrivateKey(pemRepresentation: Self.jwtPrivateKey),
+                keyIdentifier: "MY_KEY_ID",
+                teamIdentifier: "MY_TEAM_ID"
+            ),
+            session: URLSession(configuration: configuration)
+        )
+
+        let request = APNSBroadcastSendRequest(
+            message: Self.makeAlert(),
+            channelID: "channel",
+            bundleID: "com.example.app",
+            expiration: .immediately,
+            priority: .immediately
+        )
+
+        RecordingURLProtocol.reset()
+        _ = try await customClient.sendBroadcast(request)
+
+        // The mock protocol only intercepts the injected session. If the broadcast path fell back to
+        // `URLSession.shared`, the request would reach the real test server and never be recorded here.
+        let recorded = try XCTUnwrap(RecordingURLProtocol.lastRequest)
+        XCTAssertEqual(recorded.url?.path, "/4/broadcasts/apps/com.example.app")
+        XCTAssertEqual(recorded.value(forHTTPHeaderField: "user-agent"), "APNS/swift-urlsession")
+        XCTAssertEqual(server.getBroadcastSends().count, 0)
     }
 
     // MARK: - Helpers

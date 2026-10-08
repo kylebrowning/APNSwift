@@ -219,8 +219,8 @@ public final class APNSTestServer: @unchecked Sendable {
         broadcastSendsBox.withLockedValue { $0 }
     }
 
-    /// Forces the *next* `/3/device/{token}` response to be exactly `override`, bypassing all normal
-    /// validation. The override is consumed (cleared) after a single use. Pass `nil` to clear it without use.
+    /// Forces the *next* `/3/device/{token}` or `/4/broadcasts/apps/{bundleID}` response to be exactly
+    /// `override`, bypassing all normal validation. The override is consumed (cleared) after a single use. Pass `nil` to clear it without use.
     public func setResponseOverride(_ override: ResponseOverride?) {
         responseOverrideBox.withLockedValue { $0 = override }
     }
@@ -230,6 +230,19 @@ public final class APNSTestServer: @unchecked Sendable {
             defer { value = nil }
             return value
         }
+    }
+
+    /// Consumes a pending ``ResponseOverride`` and turns it into a raw response, or returns `nil`.
+    private func takeOverrideResponse() -> (status: HTTPResponseStatus, headers: HTTPHeaders, body: String)? {
+        guard let override = takeResponseOverride() else { return nil }
+        var responseHeaders = HTTPHeaders()
+        for (name, value) in override.headers {
+            responseHeaders.add(name: name, value: value)
+        }
+        if !responseHeaders.contains(name: "content-type") {
+            responseHeaders.add(name: "content-type", value: "application/json")
+        }
+        return (HTTPResponseStatus(statusCode: Int(override.status)), responseHeaders, override.body ?? "")
     }
 
     // MARK: - Authorization
@@ -575,6 +588,11 @@ public final class APNSTestServer: @unchecked Sendable {
         headers: HTTPHeaders,
         body: ByteBuffer?
     ) -> (status: HTTPResponseStatus, headers: HTTPHeaders, body: String) {
+        // A test-forced response bypasses all normal validation and isn't recorded as a broadcast send.
+        if let override = takeOverrideResponse() {
+            return override
+        }
+
         func badRequest(_ reason: String) -> (status: HTTPResponseStatus, headers: HTTPHeaders, body: String) {
             var responseHeaders = HTTPHeaders()
             responseHeaders.add(name: "content-type", value: "application/json")
@@ -652,15 +670,8 @@ public final class APNSTestServer: @unchecked Sendable {
         body: ByteBuffer?
     ) -> (status: HTTPResponseStatus, headers: HTTPHeaders, body: String) {
         // A test-forced response bypasses all normal validation and isn't recorded as a sent notification.
-        if let override = takeResponseOverride() {
-            var responseHeaders = HTTPHeaders()
-            for (name, value) in override.headers {
-                responseHeaders.add(name: name, value: value)
-            }
-            if !responseHeaders.contains(name: "content-type") {
-                responseHeaders.add(name: "content-type", value: "application/json")
-            }
-            return (HTTPResponseStatus(statusCode: Int(override.status)), responseHeaders, override.body ?? "")
+        if let override = takeOverrideResponse() {
+            return override
         }
 
         // Validate device token (Apple requires exactly 64 hexadecimal characters)
