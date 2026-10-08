@@ -13,15 +13,16 @@
 //===----------------------------------------------------------------------===//
 
 import APNSCore
-import XCTest
+import Foundation
+import Testing
 
-final class APNSControlsNotificationTests: XCTestCase {
-    func testAppID() {
+struct APNSControlsNotificationTests {
+    @Test func appID() {
         let controlsNotification = APNSControlsNotification(appID: "com.example.app")
-        XCTAssertEqual(controlsNotification.topic, "com.example.app.push-type.controls")
+        #expect(controlsNotification.topic == "com.example.app.push-type.controls")
     }
 
-    func testEncode() throws {
+    @Test func encode() throws {
         let controlsNotification = APNSControlsNotification(appID: "com.example.app")
 
         let encoder = JSONEncoder()
@@ -30,9 +31,9 @@ final class APNSControlsNotificationTests: XCTestCase {
         let expectedJSONString = """
         {"aps":{"content-changed":true}}
         """
-        let jsonObject1 = try JSONSerialization.jsonObject(with: data) as! NSDictionary
-        let jsonObject2 = try JSONSerialization.jsonObject(with: expectedJSONString.data(using: .utf8)!) as! NSDictionary
-        XCTAssertEqual(jsonObject1, jsonObject2)
+        let expectedData = try #require(expectedJSONString.data(using: .utf8))
+        let jsonObject1 = try #require(JSONSerialization.jsonObject(with: data) as? NSDictionary)
+        let jsonObject2 = try #require(JSONSerialization.jsonObject(with: expectedData) as? NSDictionary)
+        #expect(jsonObject1 == jsonObject2)
     }
-
 }

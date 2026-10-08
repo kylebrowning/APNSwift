@@ -13,10 +13,10 @@
 //===----------------------------------------------------------------------===//
 
 import APNSCore
-import XCTest
+import Testing
 
-final class APNSPriorityTests: XCTestCase {
-    func testPrioritizeDevicePower() {
-        XCTAssertEqual(APNSPriority.prioritizeDevicePower.rawValue, 1)
+struct APNSPriorityTests {
+    @Test func prioritizeDevicePower() {
+        #expect(APNSPriority.prioritizeDevicePower.rawValue == 1)
     }
 }

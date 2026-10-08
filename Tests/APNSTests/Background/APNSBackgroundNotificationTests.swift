@@ -13,10 +13,11 @@
 //===----------------------------------------------------------------------===//
 
 import APNSCore
-import XCTest
+import Foundation
+import Testing
 
-final class APNSBackgroundNotificationTests: XCTestCase {
-    func testEncode() throws {
+struct APNSBackgroundNotificationTests {
+    @Test func encode() throws {
         struct Payload: Encodable {
             let foo = "bar"
         }
@@ -33,31 +34,13 @@ final class APNSBackgroundNotificationTests: XCTestCase {
         let expectedJSONString = """
         {"foo":"bar","aps":{"content-available":1}}
         """
-        let jsonObject1 = try JSONSerialization.jsonObject(with: data) as! NSDictionary
-        let jsonObject2 = try JSONSerialization.jsonObject(with: expectedJSONString.data(using: .utf8)!) as! NSDictionary
-        XCTAssertEqual(jsonObject1, jsonObject2)
+        let expectedData = try #require(expectedJSONString.data(using: .utf8))
+        let jsonObject1 = try #require(JSONSerialization.jsonObject(with: data) as? NSDictionary)
+        let jsonObject2 = try #require(JSONSerialization.jsonObject(with: expectedData) as? NSDictionary)
+        #expect(jsonObject1 == jsonObject2)
     }
 
-    func testEncode_emptyPayloadInit() throws {
-        let apnsID = UUID()
-        let notification = APNSBackgroundNotification(
-            expiration: .immediately,
-            topic: "com.example.app",
-            apnsID: apnsID
-        )
-        XCTAssertEqual(notification.apnsID, apnsID)
-        XCTAssertEqual(notification.topic, "com.example.app")
-
-        let data = try JSONEncoder().encode(notification)
-        let expectedJSONString = """
-        {"aps":{"content-available":1}}
-        """
-        let jsonObject1 = try JSONSerialization.jsonObject(with: data) as! NSDictionary
-        let jsonObject2 = try JSONSerialization.jsonObject(with: expectedJSONString.data(using: .utf8)!) as! NSDictionary
-        XCTAssertEqual(jsonObject1, jsonObject2)
-    }
-
-    func testEncode_whenAPSKeyInPayload() throws {
+    @Test func `Encode when APS key in payload`() throws {
         struct Payload: Encodable {
             let aps = "foo"
         }
@@ -74,8 +57,29 @@ final class APNSBackgroundNotificationTests: XCTestCase {
         let expectedJSONString = """
         {"aps":{"content-available":1}}
         """
-        let jsonObject1 = try JSONSerialization.jsonObject(with: data) as! NSDictionary
-        let jsonObject2 = try JSONSerialization.jsonObject(with: expectedJSONString.data(using: .utf8)!) as! NSDictionary
-        XCTAssertEqual(jsonObject1, jsonObject2)
+        let expectedData = try #require(expectedJSONString.data(using: .utf8))
+        let jsonObject1 = try #require(JSONSerialization.jsonObject(with: data) as? NSDictionary)
+        let jsonObject2 = try #require(JSONSerialization.jsonObject(with: expectedData) as? NSDictionary)
+        #expect(jsonObject1 == jsonObject2)
     }
+
+    @Test func `Encode empty payload init`() throws {
+        let apnsID = UUID()
+        let notification = APNSBackgroundNotification(
+            expiration: .immediately,
+            topic: "com.example.app",
+            apnsID: apnsID
+        )
+        #expect(notification.apnsID == apnsID)
+        #expect(notification.topic == "com.example.app")
+
+        let data = try JSONEncoder().encode(notification)
+        let expectedJSONString = """
+        {"aps":{"content-available":1}}
+        """
+        let jsonObject1 = try #require(JSONSerialization.jsonObject(with: data) as? NSDictionary)
+        let jsonObject2 = try #require(JSONSerialization.jsonObject(with: Data(expectedJSONString.utf8)) as? NSDictionary)
+        #expect(jsonObject1 == jsonObject2)
+    }
+
 }

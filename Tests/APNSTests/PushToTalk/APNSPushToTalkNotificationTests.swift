@@ -13,10 +13,10 @@
 //===----------------------------------------------------------------------===//
 
 import APNSCore
-import XCTest
+import Testing
 
-final class APNSPushToTalkNotificationTests: XCTestCase {
-    func testAppID() {
+struct APNSPushToTalkNotificationTests {
+    @Test func appID() {
         struct Payload: Encodable {
             let foo = "bar"
         }
@@ -25,6 +25,6 @@ final class APNSPushToTalkNotificationTests: XCTestCase {
             payload: Payload()
         )
 
-        XCTAssertEqual(voipNotification.topic, "com.example.app.voip-ptt")
+        #expect(voipNotification.topic == "com.example.app.voip-ptt")
     }
 }

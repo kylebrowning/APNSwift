@@ -13,10 +13,11 @@
 //===----------------------------------------------------------------------===//
 
 import APNSCore
-import XCTest
+import Foundation
+import Testing
 
-final class APNSPushToTalkNotificationEncodingTests: XCTestCase {
-    func testEncode() throws {
+struct APNSPushToTalkNotificationEncodingTests {
+    @Test func encode() throws {
         struct Payload: Encodable {
             let foo = "bar"
         }
@@ -34,12 +35,12 @@ final class APNSPushToTalkNotificationEncodingTests: XCTestCase {
         let expectedJSONString = """
         {"foo":"bar"}
         """
-        let jsonObject1 = try JSONSerialization.jsonObject(with: data) as! NSDictionary
-        let jsonObject2 = try JSONSerialization.jsonObject(with: expectedJSONString.data(using: .utf8)!) as! NSDictionary
-        XCTAssertEqual(jsonObject1, jsonObject2)
+        let jsonObject1 = try #require(JSONSerialization.jsonObject(with: data) as? NSDictionary)
+        let jsonObject2 = try #require(JSONSerialization.jsonObject(with: Data(expectedJSONString.utf8)) as? NSDictionary)
+        #expect(jsonObject1 == jsonObject2)
     }
 
-    func testEncode_whenEmptyPayload() throws {
+    @Test func `Encode when empty payload`() throws {
         let notification = APNSPushToTalkNotification(
             expiration: .immediately,
             priority: .immediately,
@@ -52,8 +53,8 @@ final class APNSPushToTalkNotificationEncodingTests: XCTestCase {
         let expectedJSONString = """
         {}
         """
-        let jsonObject1 = try JSONSerialization.jsonObject(with: data) as! NSDictionary
-        let jsonObject2 = try JSONSerialization.jsonObject(with: expectedJSONString.data(using: .utf8)!) as! NSDictionary
-        XCTAssertEqual(jsonObject1, jsonObject2)
+        let jsonObject1 = try #require(JSONSerialization.jsonObject(with: data) as? NSDictionary)
+        let jsonObject2 = try #require(JSONSerialization.jsonObject(with: Data(expectedJSONString.utf8)) as? NSDictionary)
+        #expect(jsonObject1 == jsonObject2)
     }
 }

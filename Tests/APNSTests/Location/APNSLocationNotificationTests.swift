@@ -13,19 +13,20 @@
 //===----------------------------------------------------------------------===//
 
 import APNSCore
-import XCTest
+import Foundation
+import Testing
 
-final class APNSLocationNotificationTests: XCTestCase {
-    func testAppID() {
+struct APNSLocationNotificationTests {
+    @Test func appID() {
         let locationNotification = APNSLocationNotification(
             priority: .immediately,
             appID: "com.example.app"
         )
 
-        XCTAssertEqual(locationNotification.topic, "com.example.app.location-query")
+        #expect(locationNotification.topic == "com.example.app.location-query")
     }
 
-    func testEncode() throws {
+    @Test func encode() throws {
         let notification = APNSLocationNotification(
             priority: .immediately,
             topic: "com.example.app.location-query",
@@ -38,8 +39,8 @@ final class APNSLocationNotificationTests: XCTestCase {
         let expectedJSONString = """
         {"aps":{}}
         """
-        let jsonObject1 = try JSONSerialization.jsonObject(with: data) as! NSDictionary
-        let jsonObject2 = try JSONSerialization.jsonObject(with: expectedJSONString.data(using: .utf8)!) as! NSDictionary
-        XCTAssertEqual(jsonObject1, jsonObject2)
+        let jsonObject1 = try #require(JSONSerialization.jsonObject(with: data) as? NSDictionary)
+        let jsonObject2 = try #require(JSONSerialization.jsonObject(with: Data(expectedJSONString.utf8)) as? NSDictionary)
+        #expect(jsonObject1 == jsonObject2)
     }
 }
