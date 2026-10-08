@@ -27,8 +27,8 @@ public struct APNSAlertNotification<Payload: Encodable & Sendable>: APNSMessage,
         case aps
     }
 
-    /// The fixed content to indicate that this is a background notification.
-    private var aps = APNSAlertNotificationAPSStorage(alert: .init())
+    /// The `aps` dictionary of the notification.
+    private var aps: APNSAlertNotificationAPSStorage
 
     /// The information for displaying an alert.
     public var alert: APNSAlertNotificationContent {
@@ -274,8 +274,12 @@ extension APNSAlertNotification where Payload == EmptyPayload {
         filterCriteria: String? = nil,
         apnsID: UUID? = nil
     ) {
-        self.aps = APNSAlertNotificationAPSStorage(
+        self.init(
             alert: alert,
+            expiration: expiration,
+            priority: priority,
+            topic: topic,
+            payload: EmptyPayload(),
             badge: badge,
             sound: sound,
             threadID: threadID,
@@ -284,12 +288,8 @@ extension APNSAlertNotification where Payload == EmptyPayload {
             targetContentID: targetContentID,
             interruptionLevel: interruptionLevel,
             relevanceScore: relevanceScore,
-            filterCriteria: filterCriteria
+            filterCriteria: filterCriteria,
+            apnsID: apnsID
         )
-        self.apnsID = apnsID
-        self.expiration = expiration
-        self.priority = priority
-        self.topic = topic
-        self.payload = EmptyPayload()
     }
 }

@@ -130,32 +130,9 @@ extension APNSClient {
     public func send(_ request: APNSCore.APNSRequest<some APNSCore.APNSMessage>) async throws -> APNSCore.APNSResponse {
         var headers = self.defaultRequestHeaders
 
-        // Push type
-        headers.add(name: "apns-push-type", value: request.pushType.description)
-
-        // APNS ID
-        if let apnsID = request.apnsID {
-            headers.add(name: "apns-id", value: apnsID.uuidString.lowercased())
-        }
-
-        // Expiration
-        if let expiration = request.expiration?.expiration {
-            headers.add(name: "apns-expiration", value: String(expiration))
-        }
-
-        // Priority
-        if let priority = request.priority?.rawValue {
-            headers.add(name: "apns-priority", value: String(priority))
-        }
-
-        // Topic
-        if let topic = request.topic {
-            headers.add(name: "apns-topic", value: topic)
-        }
-
-        // Collapse ID
-        if let collapseID = request.collapseID {
-            headers.add(name: "apns-collapse-id", value: collapseID)
+        // apns-* headers (push type, id, expiration, priority, topic, collapse id)
+        for (name, value) in request.headers {
+            headers.add(name: name, value: value)
         }
 
         // Authorization token
