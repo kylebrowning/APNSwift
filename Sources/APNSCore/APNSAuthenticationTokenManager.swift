@@ -94,7 +94,7 @@ public final actor APNSAuthenticationTokenManager<Clock: _Concurrency.Clock> whe
         {
             "alg": "ES256",
             "typ": "JWT",
-            "kid": "\(Self.jsonEscaped(keyIdentifier))"
+            "kid": "\(keyIdentifier)"
         }
         """
 
@@ -103,7 +103,7 @@ public final actor APNSAuthenticationTokenManager<Clock: _Concurrency.Clock> whe
         // `kid` belongs only in the header (RFC 7515 / Apple's docs) and must not be duplicated here.
         let payload = """
         {
-            "iss": "\(Self.jsonEscaped(teamIdentifier))",
+            "iss": "\(teamIdentifier)",
             "iat": \(issueAtTime.asSecondsSince1970)
         }
         """
@@ -140,32 +140,6 @@ public final actor APNSAuthenticationTokenManager<Clock: _Concurrency.Clock> whe
             token: "bearer " + String(decoding: encodedData, as: UTF8.self),
             issuedAt: clock.now
         )
-    }
-}
-
-extension APNSAuthenticationTokenManager {
-    /// Escapes a string for interpolation inside a JSON string literal.
-    ///
-    /// Identifiers come straight from configuration, and a stray `"` or `\` would otherwise
-    /// produce a malformed JWT that APNs rejects with no local diagnostic.
-    static func jsonEscaped(_ string: String) -> String {
-        var result = ""
-        result.reserveCapacity(string.utf8.count)
-        for scalar in string.unicodeScalars {
-            switch scalar {
-            case "\"": result += "\\\""
-            case "\\": result += "\\\\"
-            case "\n": result += "\\n"
-            case "\r": result += "\\r"
-            case "\t": result += "\\t"
-            case ..<" ":
-                let hex = String(scalar.value, radix: 16)
-                result += "\\u" + String(repeating: "0", count: 4 - hex.count) + hex
-            default:
-                result.unicodeScalars.append(scalar)
-            }
-        }
-        return result
     }
 }
 
