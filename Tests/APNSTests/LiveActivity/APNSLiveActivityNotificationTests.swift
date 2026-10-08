@@ -126,6 +126,107 @@ final class APNSLiveActivityNotificationTests: XCTestCase {
         XCTAssertEqual(jsonObject1, jsonObject2)
     }
 
+    func testEncodeUpdateLocalizedAlert() throws {
+        let notification = APNSLiveActivityNotification(
+            expiration: .immediately,
+            priority: .immediately,
+            appID: "test.app.id",
+            contentState: State(),
+            event: .update,
+            alert: .init(
+                title: .localized(key: "%@ is knocked down!", arguments: ["Power Panda"]),
+                body: .localized(key: "Use a potion to heal %@!", arguments: ["Power Panda"]),
+                sound: .fileName("HeroDown.mp4")
+            ),
+            timestamp: 1_672_680_658
+        )
+
+        let encoder = JSONEncoder()
+        let data = try encoder.encode(notification)
+
+        let expectedJSONString = """
+            {"aps":{"event":"update","content-state":{"string":"Test","number":123},"timestamp":1672680658,
+            "alert":{
+              "title":{"loc-key":"%@ is knocked down!","loc-args":["Power Panda"]},
+              "body":{"loc-key":"Use a potion to heal %@!","loc-args":["Power Panda"]},
+              "sound":"HeroDown.mp4"
+            }}}
+            """
+
+        let jsonObject1 = try JSONSerialization.jsonObject(with: data) as! NSDictionary
+        let jsonObject2 =
+            try JSONSerialization.jsonObject(with: expectedJSONString.data(using: .utf8)!)
+            as! NSDictionary
+        XCTAssertEqual(jsonObject1, jsonObject2)
+    }
+
+    func testEncodeStartLocalizedAlert() throws {
+        let notification = APNSStartLiveActivityNotification(
+            expiration: .immediately,
+            priority: .immediately,
+            appID: "test.app.id",
+            contentState: State(),
+            timestamp: 1_672_680_658,
+            attributes: Attributes(),
+            attributesType: "Attributes",
+            alert: .init(
+                title: .localized(key: "%@ is on an adventure!", arguments: ["Power Panda"]),
+                body: .localized(key: "%@ found a sword!", arguments: ["Power Panda"]),
+                sound: .fileName("chime.aiff")
+            )
+        )
+
+        let encoder = JSONEncoder()
+        let data = try encoder.encode(notification)
+
+        let expectedJSONString = """
+            {"aps":{"event":"start","attributes-type":"Attributes","attributes":{"name":"Test Attribute"},
+            "content-state":{"string":"Test","number":123},"timestamp":1672680658,
+            "alert":{
+              "title":{"loc-key":"%@ is on an adventure!","loc-args":["Power Panda"]},
+              "body":{"loc-key":"%@ found a sword!","loc-args":["Power Panda"]},
+              "sound":"chime.aiff"
+            }}}
+            """
+
+        let jsonObject1 = try JSONSerialization.jsonObject(with: data) as! NSDictionary
+        let jsonObject2 =
+            try JSONSerialization.jsonObject(with: expectedJSONString.data(using: .utf8)!)
+            as! NSDictionary
+        XCTAssertEqual(jsonObject1, jsonObject2)
+    }
+
+    func testEncodeStartMixedRawAndLocalizedAlert() throws {
+        let notification = APNSStartLiveActivityNotification(
+            expiration: .immediately,
+            priority: .immediately,
+            appID: "test.app.id",
+            contentState: State(),
+            timestamp: 1_672_680_658,
+            attributes: Attributes(),
+            attributesType: "Attributes",
+            alert: .init(
+                title: .raw("Hi"),
+                body: .localized(key: "body-key", arguments: [])
+            )
+        )
+
+        let encoder = JSONEncoder()
+        let data = try encoder.encode(notification)
+
+        let expectedJSONString = """
+            {"aps":{"event":"start","attributes-type":"Attributes","attributes":{"name":"Test Attribute"},
+            "content-state":{"string":"Test","number":123},"timestamp":1672680658,
+            "alert":{"title":"Hi","body":{"loc-key":"body-key","loc-args":[]}}}}
+            """
+
+        let jsonObject1 = try JSONSerialization.jsonObject(with: data) as! NSDictionary
+        let jsonObject2 =
+            try JSONSerialization.jsonObject(with: expectedJSONString.data(using: .utf8)!)
+            as! NSDictionary
+        XCTAssertEqual(jsonObject1, jsonObject2)
+    }
+
     func testEncodeStart() throws {
         let notification = APNSStartLiveActivityNotification(
             expiration: .immediately,
