@@ -1,4 +1,4 @@
-FROM swift:5.0
+FROM swift:6.2-bookworm
 
 WORKDIR /code
 RUN export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true && apt-get -q update && \
