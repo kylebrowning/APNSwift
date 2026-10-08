@@ -356,6 +356,35 @@ struct APNSClientIntegrationTests {
         }
     }
 
+    // MARK: - MDM Notifications
+
+    @Test func `Send MDM notification`() async throws {
+        try await TestFixtures.withClient { server, client in
+            let notification = APNSMDMNotification(
+                topic: "com.apple.mgmt.External.3b3d5f2a-4b7c-4e1d-9f0a-2c9d8e7f6a5b",
+                pushMagic: "PushMagicValue"
+            )
+
+            _ = try await client.sendMDMNotification(
+                notification,
+                deviceToken: "aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111"
+            )
+
+            let sent = try #require(server.getSentNotifications().first)
+            #expect(sent.pushType == "mdm")
+            #expect(sent.topic == "com.apple.mgmt.External.3b3d5f2a-4b7c-4e1d-9f0a-2c9d8e7f6a5b")
+
+            let expectedJSONString = """
+            {"mdm":"PushMagicValue"}
+            """
+            let jsonObject1 = try #require(JSONSerialization.jsonObject(with: sent.payload) as? NSDictionary)
+            let jsonObject2 = try #require(
+                JSONSerialization.jsonObject(with: Data(expectedJSONString.utf8)) as? NSDictionary
+            )
+            #expect(jsonObject1 == jsonObject2)
+        }
+    }
+
     // MARK: - Location Notifications
 
     @Test func `Send location notification`() async throws {
