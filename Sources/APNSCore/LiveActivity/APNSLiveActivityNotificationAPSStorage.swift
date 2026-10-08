@@ -48,4 +48,15 @@ struct APNSLiveActivityNotificationAPSStorage<ContentState: Encodable & Sendable
         self.alert = alert
         self.relevanceScore = relevanceScore
     }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.timestamp, forKey: .timestamp)
+        try container.encode(self.event, forKey: .event)
+        try container.encode(self.contentState, forKey: .contentState)
+        try container.encodeIfPresent(self.dismissalDate, forKey: .dismissalDate)
+        try container.encodeIfPresent(self.staleDate, forKey: .staleDate)
+        try container.encodeIfPresent(self.alert.map(APNSLiveActivityAlertEncoding.init(content:)), forKey: .alert)
+        try container.encodeIfPresent(self.relevanceScore, forKey: .relevanceScore)
+    }
 }

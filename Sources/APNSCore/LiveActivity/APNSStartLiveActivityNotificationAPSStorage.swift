@@ -60,4 +60,18 @@ struct APNSStartLiveActivityNotificationAPSStorage<Attributes: Encodable & Senda
         self.inputPushToken = inputPushToken
         self.inputPushChannel = inputPushChannel
     }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(self.timestamp, forKey: .timestamp)
+        try container.encode(self.event, forKey: .event)
+        try container.encode(self.contentState, forKey: .contentState)
+        try container.encodeIfPresent(self.staleDate, forKey: .staleDate)
+        try container.encode(APNSLiveActivityAlertEncoding(content: self.alert), forKey: .alert)
+        try container.encode(self.attributes, forKey: .attributes)
+        try container.encode(self.attributesType, forKey: .attributesType)
+        try container.encodeIfPresent(self.relevanceScore, forKey: .relevanceScore)
+        try container.encodeIfPresent(self.inputPushToken, forKey: .inputPushToken)
+        try container.encodeIfPresent(self.inputPushChannel, forKey: .inputPushChannel)
+    }
 }
