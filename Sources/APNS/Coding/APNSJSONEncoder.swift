@@ -18,7 +18,6 @@ import FoundationEssentials
 import Foundation
 #endif
 import NIOCore
-import NIOFoundationCompat
 
 /// A protocol that is similar to the `JSONEncoder`. This allows users of APNSwift to customize the encoder used
 /// for encoding the notification JSON payloads.
@@ -29,6 +28,6 @@ public protocol APNSJSONEncoder {
 extension JSONEncoder: APNSJSONEncoder {
     public func encode<T: Encodable>(_ value: T, into buffer: inout ByteBuffer) throws {
         let data = try encode(value)
-        buffer.writeData(data)
+        buffer.writeBytes(data)
     }
 }

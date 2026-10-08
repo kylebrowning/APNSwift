@@ -43,6 +43,22 @@ final class APNSRequestTests: XCTestCase {
         XCTAssertEqual(headers["apns-push-type"], "alert")
     }
 
+    func testHeaders_accessoryPushType() throws {
+        let request = APNSRequest(
+            message: TestMessage(),
+            deviceToken: "token",
+            pushType: .accessory,
+            expiration: nil,
+            priority: nil,
+            apnsID: nil,
+            topic: "com.example.app.push-type.accessory",
+            collapseID: nil
+        )
+
+        XCTAssertEqual(request.headers["apns-push-type"], "accessory")
+        XCTAssertEqual(request.headers["apns-topic"], "com.example.app.push-type.accessory")
+    }
+
     func testHeaders_apnsIDIsLowercased() throws {
         // UUID() can produce uppercase hex; the header value must always be lowercased.
         let apnsID = UUID(uuidString: "ABCDEF12-3456-7890-ABCD-EF1234567890")!

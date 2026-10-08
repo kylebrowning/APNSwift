@@ -12,7 +12,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if canImport(FoundationEssentials)
+import struct FoundationEssentials.Date
+#else
 import struct Foundation.Date
+#endif
 
 public struct APNSLiveActivityDismissalDate: Hashable, Sendable {
     /// The date at which the live activity will be dismissed

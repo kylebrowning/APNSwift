@@ -6,7 +6,7 @@ set -o pipefail
 
 echo ""
 echo "Running Tests in Docker Container"
-echo "Swift 5"
+echo "Swift 6.2"
 echo "================================="
 docker rmi swift-nio-apns
 docker build -t swift-nio-apns -f Dockerfile .
