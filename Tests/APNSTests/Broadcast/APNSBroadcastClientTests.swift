@@ -14,182 +14,147 @@
 
 @testable import APNSCore
 import APNS
-import APNSTestServer
-import Crypto
-import NIOPosix
-import XCTest
+import Foundation
+import Testing
 
-final class APNSBroadcastClientTests: XCTestCase {
-    var server: APNSTestServer!
-    var client: APNSBroadcastClient<JSONDecoder, JSONEncoder>!
+struct APNSBroadcastClientTests {
+    @Test func `Create channel`() async throws {
+        try await TestFixtures.withBroadcastClient { _, client in
+            let channel = APNSBroadcastChannel(messageStoragePolicy: .mostRecentMessageStored)
+            let response = try await client.create(channel: channel, apnsRequestID: nil)
 
-    override func setUp() async throws {
-        try await super.setUp()
-
-        // Start the mock server
-        server = APNSTestServer()
-        try await server.start(port: 0)
-
-        // Create a client pointing to the mock server
-        let serverPort = server.port
-        client = APNSBroadcastClient(
-            authenticationMethod: .jwt(
-                privateKey: try! P256.Signing.PrivateKey(pemRepresentation: jwtPrivateKey),
-                keyIdentifier: "MY_KEY_ID",
-                teamIdentifier: "MY_TEAM_ID"
-            ),
-            environment: .custom(url: "http://127.0.0.1", port: serverPort),
-            bundleID: "com.example.testapp",
-            eventLoopGroupProvider: .shared(MultiThreadedEventLoopGroup.singleton),
-            responseDecoder: JSONDecoder(),
-            requestEncoder: JSONEncoder()
-        )
-    }
-
-    override func tearDown() async throws {
-        try await client?.shutdown()
-        try await server?.shutdown()
-        client = nil
-        server = nil
-        try await super.tearDown()
-    }
-
-    func testCreateChannel() async throws {
-        let channel = APNSBroadcastChannel(messageStoragePolicy: .mostRecentMessageStored)
-        let response = try await client.create(channel: channel, apnsRequestID: nil)
-
-        XCTAssertNotNil(response.apnsRequestID)
-        XCTAssertNotNil(response.channelID)
-    }
-
-    func testCreateChannel_noMessageStored() async throws {
-        let channel = APNSBroadcastChannel(messageStoragePolicy: .noMessageStored)
-        let response = try await client.create(channel: channel, apnsRequestID: nil)
-
-        XCTAssertNotNil(response.apnsRequestID)
-        XCTAssertNotNil(response.channelID)
-    }
-
-    func testReadChannel() async throws {
-        // First, create a channel
-        let channel = APNSBroadcastChannel(messageStoragePolicy: .mostRecentMessageStored)
-        let createResponse = try await client.create(channel: channel, apnsRequestID: nil)
-        let channelID = createResponse.channelID!
-
-        // Now read it back
-        let readResponse = try await client.read(channelID: channelID, apnsRequestID: nil)
-
-        XCTAssertNotNil(readResponse.apnsRequestID)
-        XCTAssertEqual(readResponse.channelID, channelID)
-        XCTAssertEqual(readResponse.body?.messageStoragePolicy, .mostRecentMessageStored)
-        XCTAssertEqual(readResponse.body?.pushType, "LiveActivity")
-    }
-
-    func testReadChannel_notFound() async throws {
-        do {
-            _ = try await client.read(channelID: "non-existent-channel", apnsRequestID: nil)
-            XCTFail("Expected error to be thrown")
-        } catch let error as APNSError {
-            XCTAssertEqual(error.responseStatus, 400)
-            XCTAssertEqual(error.reason, .channelNotRegistered)
+            #expect(response.apnsRequestID != nil)
+            #expect(response.channelID != nil)
         }
     }
 
-    func testDeleteChannel() async throws {
-        // First, create a channel
-        let channel = APNSBroadcastChannel(messageStoragePolicy: .noMessageStored)
-        let createResponse = try await client.create(channel: channel, apnsRequestID: nil)
-        let channelID = createResponse.channelID!
+    @Test func `Create channel no message stored`() async throws {
+        try await TestFixtures.withBroadcastClient { _, client in
+            let channel = APNSBroadcastChannel(messageStoragePolicy: .noMessageStored)
+            let response = try await client.create(channel: channel, apnsRequestID: nil)
 
-        // Delete it
-        let deleteResponse = try await client.delete(channelID: channelID, apnsRequestID: nil)
-        XCTAssertNotNil(deleteResponse.apnsRequestID)
-
-        // Verify it's gone
-        do {
-            _ = try await client.read(channelID: channelID, apnsRequestID: nil)
-            XCTFail("Expected error to be thrown")
-        } catch let error as APNSError {
-            XCTAssertEqual(error.responseStatus, 400)
-            XCTAssertEqual(error.reason, .channelNotRegistered)
+            #expect(response.apnsRequestID != nil)
+            #expect(response.channelID != nil)
         }
     }
 
-    func testDeleteChannel_notFound() async throws {
-        do {
-            _ = try await client.delete(channelID: "non-existent-channel", apnsRequestID: nil)
-            XCTFail("Expected error to be thrown")
-        } catch let error as APNSError {
-            XCTAssertEqual(error.responseStatus, 400)
-            XCTAssertEqual(error.reason, .channelNotRegistered)
+    @Test func `Read channel`() async throws {
+        try await TestFixtures.withBroadcastClient { _, client in
+            // First, create a channel
+            let channel = APNSBroadcastChannel(messageStoragePolicy: .mostRecentMessageStored)
+            let createResponse = try await client.create(channel: channel, apnsRequestID: nil)
+            let channelID = try #require(createResponse.channelID)
+
+            // Now read it back
+            let readResponse = try await client.read(channelID: channelID, apnsRequestID: nil)
+
+            #expect(readResponse.apnsRequestID != nil)
+            #expect(readResponse.channelID == channelID)
+            #expect(readResponse.body?.messageStoragePolicy == .mostRecentMessageStored)
+            #expect(readResponse.body?.pushType == "LiveActivity")
         }
     }
 
-    func testListAllChannels() async throws {
-        // Create a few channels
-        let channel1 = APNSBroadcastChannel(messageStoragePolicy: .mostRecentMessageStored)
-        let channel2 = APNSBroadcastChannel(messageStoragePolicy: .noMessageStored)
-        let channel3 = APNSBroadcastChannel(messageStoragePolicy: .mostRecentMessageStored)
-
-        let response1 = try await client.create(channel: channel1, apnsRequestID: nil)
-        let response2 = try await client.create(channel: channel2, apnsRequestID: nil)
-        let response3 = try await client.create(channel: channel3, apnsRequestID: nil)
-
-        let channelID1 = response1.channelID!
-        let channelID2 = response2.channelID!
-        let channelID3 = response3.channelID!
-
-        // List all channels
-        let listResponse = try await client.readAllChannelIDs(apnsRequestID: nil)
-
-        XCTAssertNotNil(listResponse.apnsRequestID)
-        let channels = try XCTUnwrap(listResponse.body?.channels)
-        XCTAssertEqual(channels.count, 3)
-        XCTAssertTrue(channels.contains(channelID1))
-        XCTAssertTrue(channels.contains(channelID2))
-        XCTAssertTrue(channels.contains(channelID3))
+    @Test func `Read channel not found`() async throws {
+        try await TestFixtures.withBroadcastClient { _, client in
+            let error = try await #require(throws: APNSError.self) {
+                try await client.read(channelID: "non-existent-channel", apnsRequestID: nil)
+            }
+            #expect(error.responseStatus == 400)
+            #expect(error.reason == .channelNotRegistered)
+        }
     }
 
-    func testListAllChannels_empty() async throws {
-        let listResponse = try await client.readAllChannelIDs(apnsRequestID: nil)
+    @Test func `Delete channel`() async throws {
+        try await TestFixtures.withBroadcastClient { _, client in
+            // First, create a channel
+            let channel = APNSBroadcastChannel(messageStoragePolicy: .noMessageStored)
+            let createResponse = try await client.create(channel: channel, apnsRequestID: nil)
+            let channelID = try #require(createResponse.channelID)
 
-        XCTAssertNotNil(listResponse.apnsRequestID)
-        let channels = try XCTUnwrap(listResponse.body?.channels)
-        XCTAssertEqual(channels.count, 0)
+            // Delete it
+            let deleteResponse = try await client.delete(channelID: channelID, apnsRequestID: nil)
+            #expect(deleteResponse.apnsRequestID != nil)
+
+            // Verify it's gone
+            let error = try await #require(throws: APNSError.self) {
+                try await client.read(channelID: channelID, apnsRequestID: nil)
+            }
+            #expect(error.responseStatus == 400)
+            #expect(error.reason == .channelNotRegistered)
+        }
+    }
+
+    @Test func `Delete channel not found`() async throws {
+        try await TestFixtures.withBroadcastClient { _, client in
+            let error = try await #require(throws: APNSError.self) {
+                try await client.delete(channelID: "non-existent-channel", apnsRequestID: nil)
+            }
+            #expect(error.responseStatus == 400)
+            #expect(error.reason == .channelNotRegistered)
+        }
+    }
+
+    @Test func `List all channels`() async throws {
+        try await TestFixtures.withBroadcastClient { _, client in
+            // Create a few channels
+            let channel1 = APNSBroadcastChannel(messageStoragePolicy: .mostRecentMessageStored)
+            let channel2 = APNSBroadcastChannel(messageStoragePolicy: .noMessageStored)
+            let channel3 = APNSBroadcastChannel(messageStoragePolicy: .mostRecentMessageStored)
+
+            let response1 = try await client.create(channel: channel1, apnsRequestID: nil)
+            let response2 = try await client.create(channel: channel2, apnsRequestID: nil)
+            let response3 = try await client.create(channel: channel3, apnsRequestID: nil)
+
+            let channelID1 = try #require(response1.channelID)
+            let channelID2 = try #require(response2.channelID)
+            let channelID3 = try #require(response3.channelID)
+
+            // List all channels
+            let listResponse = try await client.readAllChannelIDs(apnsRequestID: nil)
+
+            #expect(listResponse.apnsRequestID != nil)
+            let channels = try #require(listResponse.body?.channels)
+            #expect(channels.count == 3)
+            #expect(channels.contains(channelID1))
+            #expect(channels.contains(channelID2))
+            #expect(channels.contains(channelID3))
+        }
+    }
+
+    @Test func `List all channels empty`() async throws {
+        try await TestFixtures.withBroadcastClient { _, client in
+            let listResponse = try await client.readAllChannelIDs(apnsRequestID: nil)
+
+            #expect(listResponse.apnsRequestID != nil)
+            let channels = try #require(listResponse.body?.channels)
+            #expect(channels.count == 0)
+        }
     }
 
     // MARK: - Operation path contract
 
-    func testOperationPaths() {
+    @Test func `Operation paths`() {
         // Individual channel operations target `/channels`...
-        XCTAssertEqual(APNSBroadcastRequest<EmptyPayload>(operation: .create).operation.path, "/channels")
-        XCTAssertEqual(APNSBroadcastRequest<EmptyPayload>(operation: .read(channelID: "x")).operation.path, "/channels")
-        XCTAssertEqual(APNSBroadcastRequest<EmptyPayload>(operation: .delete(channelID: "x")).operation.path, "/channels")
+        #expect(APNSBroadcastRequest<EmptyPayload>(operation: .create).operation.path == "/channels")
+        #expect(APNSBroadcastRequest<EmptyPayload>(operation: .read(channelID: "x")).operation.path == "/channels")
+        #expect(APNSBroadcastRequest<EmptyPayload>(operation: .delete(channelID: "x")).operation.path == "/channels")
         // ...while "read all channels" lives on Apple's distinct `/all-channels` endpoint.
-        XCTAssertEqual(APNSBroadcastRequest<EmptyPayload>(operation: .listAll).operation.path, "/all-channels")
+        #expect(APNSBroadcastRequest<EmptyPayload>(operation: .listAll).operation.path == "/all-channels")
     }
 
-    func testRequestID() async throws {
-        let requestID = UUID()
-        let channel = APNSBroadcastChannel(messageStoragePolicy: .mostRecentMessageStored)
-        let response = try await client.create(channel: channel, apnsRequestID: requestID)
+    @Test func `Request ID`() async throws {
+        try await TestFixtures.withBroadcastClient { server, client in
+            let requestID = UUID()
+            let channel = APNSBroadcastChannel(messageStoragePolicy: .mostRecentMessageStored)
+            let response = try await client.create(channel: channel, apnsRequestID: requestID)
 
-        // The server echoes back the `apns-request-id` header the client sent.
-        let requests = server.getBroadcastRequests()
-        let createRequest = try XCTUnwrap(requests.first { $0.method == "POST" })
-        XCTAssertEqual(createRequest.apnsRequestID, requestID.uuidString.lowercased())
+            // The server echoes back the `apns-request-id` header the client sent.
+            let requests = server.getBroadcastRequests()
+            let createRequest = try #require(requests.first { $0.method == "POST" })
+            #expect(createRequest.apnsRequestID == requestID.uuidString.lowercased())
 
-        XCTAssertEqual(response.apnsRequestID, requestID)
+            #expect(response.apnsRequestID == requestID)
+        }
     }
-
-    // MARK: - Helper
-
-    private let jwtPrivateKey = """
-    -----BEGIN PRIVATE KEY-----
-    MIGTAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBHkwdwIBAQQg2sD+kukkA8GZUpmm
-    jRa4fJ9Xa/JnIG4Hpi7tNO66+OGgCgYIKoZIzj0DAQehRANCAATZp0yt0btpR9kf
-    ntp4oUUzTV0+eTELXxJxFvhnqmgwGAm1iVW132XLrdRG/ntlbQ1yzUuJkHtYBNve
-    y+77Vzsd
-    -----END PRIVATE KEY-----
-    """
 }

@@ -13,9 +13,10 @@
 //===----------------------------------------------------------------------===//
 
 import APNSCore
-import XCTest
+import Foundation
+import Testing
 
-final class APNSErrorReasonTests: XCTestCase {
+struct APNSErrorReasonTests {
     /// Every known APNs reason string paired with the case it must map to.
     private static let knownReasons: [(APNSError.ErrorReason.Reason, String)] = [
         (.badCollapseIdentifier, "BadCollapseId"),
@@ -62,64 +63,60 @@ final class APNSErrorReasonTests: XCTestCase {
         (.topicMismatch, "TopicMismatch"),
     ]
 
-    func testEveryKnownReasonRoundTrips() {
-        for (reason, raw) in Self.knownReasons {
-            XCTAssertEqual(reason.rawValue, raw, "rawValue mismatch for \(reason)")
-            XCTAssertEqual(
-                APNSError.ErrorReason.Reason(rawValue: raw),
-                reason,
-                "string \"\(raw)\" did not map back to \(reason)"
-            )
-            XCTAssertFalse(reason.errorDescription.isEmpty, "missing description for \(reason)")
-        }
+    @Test(arguments: Self.knownReasons)
+    func `Every known reason round trips`(reason: APNSError.ErrorReason.Reason, raw: String) {
+        #expect(reason.rawValue == raw, "rawValue mismatch for \(reason)")
+        #expect(
+            APNSError.ErrorReason.Reason(rawValue: raw) == reason,
+            "string \"\(raw)\" did not map back to \(reason)"
+        )
+        #expect(!reason.errorDescription.isEmpty, "missing description for \(reason)")
     }
 
-    func testUnknownReasonIsPreserved() {
+    @Test func `Unknown reason is preserved`() {
         let reason = APNSError.ErrorReason.Reason(rawValue: "SomeBrandNewReason")
-        XCTAssertEqual(reason, .unknown("SomeBrandNewReason"))
-        XCTAssertEqual(reason.rawValue, "SomeBrandNewReason")
-        XCTAssertFalse(reason.errorDescription.isEmpty)
+        #expect(reason == .unknown("SomeBrandNewReason"))
+        #expect(reason.rawValue == "SomeBrandNewReason")
+        #expect(!reason.errorDescription.isEmpty)
     }
 
     /// `BadEnvironmentKeyInToken` and `BadEnvironmentKeyIdInToken` differ by a single `Id` —
     /// guard against the two being conflated.
-    func testSimilarEnvironmentReasonsAreDistinct() {
-        XCTAssertNotEqual(
-            APNSError.ErrorReason.Reason.badEnvironmentKeyInToken,
-            APNSError.ErrorReason.Reason.badEnvironmentKeyIdInToken
+    @Test func `Similar environment reasons are distinct`() {
+        #expect(
+            APNSError.ErrorReason.Reason.badEnvironmentKeyInToken
+                != APNSError.ErrorReason.Reason.badEnvironmentKeyIdInToken
         )
-        XCTAssertEqual(
-            APNSError.ErrorReason.Reason(rawValue: "BadEnvironmentKeyInToken"),
-            .badEnvironmentKeyInToken
+        #expect(
+            APNSError.ErrorReason.Reason(rawValue: "BadEnvironmentKeyInToken") == .badEnvironmentKeyInToken
         )
-        XCTAssertEqual(
-            APNSError.ErrorReason.Reason(rawValue: "BadEnvironmentKeyIdInToken"),
-            .badEnvironmentKeyIdInToken
+        #expect(
+            APNSError.ErrorReason.Reason(rawValue: "BadEnvironmentKeyIdInToken") == .badEnvironmentKeyIdInToken
         )
     }
 
     /// Exercises the path `APNSError` actually uses: decoding an `APNSErrorResponse` and
     /// surfacing the typed reason.
-    func testErrorMapsDecodedResponseReason() throws {
+    @Test func `Error maps decoded response reason`() throws {
         let data = Data(#"{"reason":"BadDeviceToken"}"#.utf8)
         let response = try JSONDecoder().decode(APNSErrorResponse.self, from: data)
         let error = APNSError(responseStatus: 400, apnsResponse: response)
-        XCTAssertEqual(error.reason, .badDeviceToken)
+        #expect(error.reason == .badDeviceToken)
     }
 
     /// The 9 broadcast/channel reasons documented at
     /// https://developer.apple.com/documentation/usernotifications/handling-error-responses-from-apns
     /// that this library previously lacked.
-    func testBroadcastReasonAccessors() {
-        XCTAssertEqual(APNSError.ErrorReason.featureNotEnabled.reason, "FeatureNotEnabled")
-        XCTAssertEqual(APNSError.ErrorReason.missingChannelId.reason, "MissingChannelId")
-        XCTAssertEqual(APNSError.ErrorReason.badChannelId.reason, "BadChannelId")
-        XCTAssertEqual(APNSError.ErrorReason.channelNotRegistered.reason, "ChannelNotRegistered")
-        XCTAssertEqual(APNSError.ErrorReason.badRequestParams.reason, "BadRequestParams")
-        XCTAssertEqual(APNSError.ErrorReason.badRequestPayload.reason, "BadRequestPayload")
-        XCTAssertEqual(APNSError.ErrorReason.missingPushType.reason, "MissingPushType")
-        XCTAssertEqual(APNSError.ErrorReason.cannotCreateChannelConfig.reason, "CannotCreateChannelConfig")
-        XCTAssertEqual(APNSError.ErrorReason.topicMismatch.reason, "TopicMismatch")
+    @Test func broadcastReasonAccessors() {
+        #expect(APNSError.ErrorReason.featureNotEnabled.reason == "FeatureNotEnabled")
+        #expect(APNSError.ErrorReason.missingChannelId.reason == "MissingChannelId")
+        #expect(APNSError.ErrorReason.badChannelId.reason == "BadChannelId")
+        #expect(APNSError.ErrorReason.channelNotRegistered.reason == "ChannelNotRegistered")
+        #expect(APNSError.ErrorReason.badRequestParams.reason == "BadRequestParams")
+        #expect(APNSError.ErrorReason.badRequestPayload.reason == "BadRequestPayload")
+        #expect(APNSError.ErrorReason.missingPushType.reason == "MissingPushType")
+        #expect(APNSError.ErrorReason.cannotCreateChannelConfig.reason == "CannotCreateChannelConfig")
+        #expect(APNSError.ErrorReason.topicMismatch.reason == "TopicMismatch")
     }
 
     // MARK: - Equality / Hashable
@@ -127,7 +124,7 @@ final class APNSErrorReasonTests: XCTestCase {
     /// `==`/`hash(into:)` compare every stored property, so two errors that differ only in
     /// `apnsUniqueID` must NOT be considered equal, while two errors with identical properties
     /// (including `apnsUniqueID`) must be both equal and hash-equal.
-    func testEqualityConsidersEveryProperty() throws {
+    @Test func `Equality considers every property`() throws {
         let data = Data(#"{"reason":"BadDeviceToken"}"#.utf8)
         let response = try JSONDecoder().decode(APNSErrorResponse.self, from: data)
         let apnsID = UUID()
@@ -138,9 +135,9 @@ final class APNSErrorReasonTests: XCTestCase {
         let rhsDifferentUniqueID = APNSError(responseStatus: 400, apnsID: apnsID, apnsUniqueID: uniqueID2, apnsResponse: response)
         let rhsSame = APNSError(responseStatus: 400, apnsID: apnsID, apnsUniqueID: uniqueID1, apnsResponse: response)
 
-        XCTAssertNotEqual(lhs, rhsDifferentUniqueID)
+        #expect(lhs != rhsDifferentUniqueID)
 
-        XCTAssertEqual(lhs, rhsSame)
-        XCTAssertEqual(lhs.hashValue, rhsSame.hashValue)
+        #expect(lhs == rhsSame)
+        #expect(lhs.hashValue == rhsSame.hashValue)
     }
 }

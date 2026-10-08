@@ -15,9 +15,9 @@
 @testable import APNSCore
 import APNS
 import APNSTestServer
-import Crypto
+import Foundation
 import NIOPosix
-import XCTest
+import Testing
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 import APNSURLSession
@@ -28,206 +28,138 @@ import APNSURLSession
 /// Channel CRUD goes through ``APNSBroadcastClient`` (the `/1/apps/...` management host), while
 /// broadcast *send* goes through the regular device-push ``APNSClient`` (the `/4/broadcasts/apps/...`
 /// path lives on the same host as `/3/device/...`). Both clients are pointed at the same mock server.
-final class APNSBroadcastSendTests: XCTestCase {
-    var server: APNSTestServer!
-    var broadcastClient: APNSBroadcastClient<JSONDecoder, JSONEncoder>!
-    var client: APNSClient<JSONDecoder, JSONEncoder>!
+struct APNSBroadcastSendTests {
+    @Test func `Send broadcast live activity update success`() async throws {
+        try await Self.withClients { server, broadcastClient, client in
+            let channelID = try await Self.createChannel(using: broadcastClient)
 
-    override func setUp() async throws {
-        try await super.setUp()
-
-        server = APNSTestServer()
-        try await server.start(port: 0)
-
-        let serverPort = server.port
-
-        broadcastClient = APNSBroadcastClient(
-            authenticationMethod: .jwt(
-                privateKey: try P256.Signing.PrivateKey(pemRepresentation: Self.jwtPrivateKey),
-                keyIdentifier: "MY_KEY_ID",
-                teamIdentifier: "MY_TEAM_ID"
-            ),
-            environment: .custom(url: "http://127.0.0.1", port: serverPort),
-            bundleID: Self.bundleID,
-            eventLoopGroupProvider: .shared(MultiThreadedEventLoopGroup.singleton),
-            responseDecoder: JSONDecoder(),
-            requestEncoder: JSONEncoder()
-        )
-
-        client = APNSClient(
-            configuration: .init(
-                authenticationMethod: .jwt(
-                    privateKey: try P256.Signing.PrivateKey(pemRepresentation: Self.jwtPrivateKey),
-                    keyIdentifier: "MY_KEY_ID",
-                    teamIdentifier: "MY_TEAM_ID"
-                ),
-                environment: .custom(url: "http://127.0.0.1", port: serverPort)
-            ),
-            eventLoopGroupProvider: .shared(MultiThreadedEventLoopGroup.singleton),
-            responseDecoder: JSONDecoder(),
-            requestEncoder: JSONEncoder()
-        )
-    }
-
-    override func tearDown() async throws {
-        try await broadcastClient?.shutdown()
-        try await client?.shutdown()
-        try await server?.shutdown()
-        broadcastClient = nil
-        client = nil
-        server = nil
-        try await super.tearDown()
-    }
-
-    func testSendBroadcastLiveActivityUpdate_success() async throws {
-        let channelID = try await createChannel()
-
-        let response = try await client.sendBroadcastLiveActivityNotification(
-            Self.makeUpdate(),
-            channelID: channelID,
-            bundleID: Self.bundleID
-        )
-
-        XCTAssertNotNil(response.apnsRequestID)
-        XCTAssertNotNil(response.apnsUniqueID)
-
-        let sends = server.getBroadcastSends()
-        XCTAssertEqual(sends.count, 1)
-
-        let sent = try XCTUnwrap(sends.first)
-        XCTAssertEqual(sent.bundleID, Self.bundleID)
-        XCTAssertEqual(sent.channelID, channelID)
-        XCTAssertEqual(sent.pushType, "liveactivity")
-
-        let payload = try sent.decodedPayload(as: BroadcastPayload.self)
-        XCTAssertEqual(payload.aps.event, "update")
-    }
-
-    func testSendBroadcast_requestIDEcho() async throws {
-        let channelID = try await createChannel()
-        let requestID = UUID()
-
-        let response = try await client.sendBroadcastLiveActivityNotification(
-            Self.makeUpdate(),
-            channelID: channelID,
-            bundleID: Self.bundleID,
-            apnsRequestID: requestID
-        )
-
-        XCTAssertEqual(response.apnsRequestID, requestID)
-
-        let sent = try XCTUnwrap(server.getBroadcastSends().first)
-        XCTAssertEqual(sent.receivedRequestID, requestID.uuidString.lowercased())
-    }
-
-    func testSendBroadcast_channelNotRegistered() async throws {
-        do {
-            _ = try await client.sendBroadcastLiveActivityNotification(
+            let response = try await client.sendBroadcastLiveActivityNotification(
                 Self.makeUpdate(),
-                channelID: UUID().uuidString,
+                channelID: channelID,
                 bundleID: Self.bundleID
             )
-            XCTFail("Expected an APNSError to be thrown")
-        } catch let error as APNSError {
+
+            #expect(response.apnsRequestID != nil)
+            #expect(response.apnsUniqueID != nil)
+
+            let sends = server.getBroadcastSends()
+            #expect(sends.count == 1)
+
+            let sent = try #require(sends.first)
+            #expect(sent.bundleID == Self.bundleID)
+            #expect(sent.channelID == channelID)
+            #expect(sent.pushType == "liveactivity")
+
+            let payload = try sent.decodedPayload(as: BroadcastPayload.self)
+            #expect(payload.aps.event == "update")
+        }
+    }
+
+    @Test func `Send broadcast request ID echo`() async throws {
+        try await Self.withClients { server, broadcastClient, client in
+            let channelID = try await Self.createChannel(using: broadcastClient)
+            let requestID = UUID()
+
+            let response = try await client.sendBroadcastLiveActivityNotification(
+                Self.makeUpdate(),
+                channelID: channelID,
+                bundleID: Self.bundleID,
+                apnsRequestID: requestID
+            )
+
+            #expect(response.apnsRequestID == requestID)
+
+            let sent = try #require(server.getBroadcastSends().first)
+            #expect(sent.receivedRequestID == requestID.uuidString.lowercased())
+        }
+    }
+
+    @Test func `Send broadcast channel not registered`() async throws {
+        try await Self.withClients { _, _, client in
+            let error = try await #require(throws: APNSError.self) {
+                try await client.sendBroadcastLiveActivityNotification(
+                    Self.makeUpdate(),
+                    channelID: UUID().uuidString,
+                    bundleID: Self.bundleID
+                )
+            }
             // A parallel PR may add a typed `.channelNotRegistered` reason; keep this robust
             // against that by only asserting the status code here.
-            XCTAssertEqual(error.responseStatus, 400)
+            #expect(error.responseStatus == 400)
         }
     }
 
     #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-    func testSendBroadcastLiveActivityUpdate_urlSessionClient_success() async throws {
-        let channelID = try await createChannel()
+    @Test func `Send broadcast live activity update URLSession client success`() async throws {
+        try await Self.withClients { server, broadcastClient, _ in
+            let channelID = try await Self.createChannel(using: broadcastClient)
 
-        let urlSessionClient = APNSURLSessionClient(
-            configuration: .init(
-                environment: .custom(url: "http://127.0.0.1", port: server.port),
-                privateKey: try P256.Signing.PrivateKey(pemRepresentation: Self.jwtPrivateKey),
-                keyIdentifier: "MY_KEY_ID",
-                teamIdentifier: "MY_TEAM_ID"
+            let urlSessionClient = try TestFixtures.urlSessionClient(for: server)
+
+            let request = APNSBroadcastSendRequest(
+                message: Self.makeUpdate(),
+                channelID: channelID,
+                bundleID: Self.bundleID,
+                expiration: .immediately,
+                priority: .immediately
             )
-        )
 
-        let request = APNSBroadcastSendRequest(
-            message: Self.makeUpdate(),
-            channelID: channelID,
-            bundleID: Self.bundleID,
-            expiration: .immediately,
-            priority: .immediately
-        )
+            let response = try await urlSessionClient.sendBroadcast(request)
 
-        let response = try await urlSessionClient.sendBroadcast(request)
+            #expect(response.apnsRequestID != nil)
+            #expect(response.apnsUniqueID != nil)
 
-        XCTAssertNotNil(response.apnsRequestID)
-        XCTAssertNotNil(response.apnsUniqueID)
-
-        let sends = server.getBroadcastSends()
-        XCTAssertEqual(sends.count, 1)
-        XCTAssertEqual(sends.first?.channelID, channelID)
+            let sends = server.getBroadcastSends()
+            #expect(sends.count == 1)
+            #expect(sends.first?.channelID == channelID)
+        }
     }
     #endif
 
-    func testSendBroadcast_forced503NonJSONBody_yieldsTypedErrorWithNilReason() async throws {
-        let channelID = try await createChannel()
-        server.setResponseOverride(.init(status: 503, body: "<html>unavailable</html>"))
+    @Test func `Send broadcast payload too large`() async throws {
+        try await Self.withClients { _, broadcastClient, client in
+            let channelID = try await Self.createChannel(using: broadcastClient)
 
-        do {
-            _ = try await client.sendBroadcastLiveActivityNotification(
-                Self.makeUpdate(),
-                channelID: channelID,
-                bundleID: Self.bundleID
+            // Comfortably over the 5,120-byte broadcast payload limit.
+            let oversizedState = LargeContentState(text: String(repeating: "x", count: 6000))
+            let notification = APNSLiveActivityNotification(
+                expiration: .immediately,
+                priority: .immediately,
+                appID: Self.bundleID,
+                contentState: oversizedState,
+                event: .update,
+                timestamp: 0
             )
-            XCTFail("Expected an APNSError to be thrown")
-        } catch let error as APNSError {
-            XCTAssertEqual(error.responseStatus, 503)
-            XCTAssertNil(error.reason)
-        } catch {
-            XCTFail("Expected an APNSError, got \(type(of: error)): \(error)")
+
+            let error = try await #require(throws: APNSError.self) {
+                try await client.sendBroadcastLiveActivityNotification(
+                    notification,
+                    channelID: channelID,
+                    bundleID: Self.bundleID
+                )
+            }
+            #expect(error.responseStatus == 413)
         }
     }
 
-    func testSendBroadcast_forced500EmptyBody_yieldsTypedErrorWithNilReason() async throws {
-        let channelID = try await createChannel()
-        server.setResponseOverride(.init(status: 500))
+    @Test(arguments: [
+        (UInt(503), "<html>unavailable</html>"),
+        (UInt(500), String?.none),
+    ])
+    func `Send broadcast undecodable error body yields typed error with nil reason`(status: UInt, body: String?) async throws {
+        try await Self.withClients { server, broadcastClient, client in
+            let channelID = try await Self.createChannel(using: broadcastClient)
+            server.setResponseOverride(.init(status: status, body: body))
 
-        do {
-            _ = try await client.sendBroadcastLiveActivityNotification(
-                Self.makeUpdate(),
-                channelID: channelID,
-                bundleID: Self.bundleID
-            )
-            XCTFail("Expected an APNSError to be thrown")
-        } catch let error as APNSError {
-            XCTAssertEqual(error.responseStatus, 500)
-            XCTAssertNil(error.reason)
-        } catch {
-            XCTFail("Expected an APNSError, got \(type(of: error)): \(error)")
-        }
-    }
-
-    func testSendBroadcast_payloadTooLarge() async throws {
-        let channelID = try await createChannel()
-
-        // Comfortably over the 5,120-byte broadcast payload limit.
-        let oversizedState = LargeContentState(text: String(repeating: "x", count: 6000))
-        let notification = APNSLiveActivityNotification(
-            expiration: .immediately,
-            priority: .immediately,
-            appID: Self.bundleID,
-            contentState: oversizedState,
-            event: .update,
-            timestamp: 0
-        )
-
-        do {
-            _ = try await client.sendBroadcastLiveActivityNotification(
-                notification,
-                channelID: channelID,
-                bundleID: Self.bundleID
-            )
-            XCTFail("Expected an APNSError to be thrown")
-        } catch let error as APNSError {
-            XCTAssertEqual(error.responseStatus, 413)
+            let error = try await #require(throws: APNSError.self) {
+                try await client.sendBroadcastLiveActivityNotification(
+                    Self.makeUpdate(),
+                    channelID: channelID,
+                    bundleID: Self.bundleID
+                )
+            }
+            #expect(error.responseStatus == Int(status))
+            #expect(error.reason == nil)
         }
     }
 
@@ -235,10 +167,50 @@ final class APNSBroadcastSendTests: XCTestCase {
 
     private static let bundleID = "com.example.testapp"
 
-    private func createChannel() async throws -> String {
+    private static func withClients<T>(
+        _ body: (
+            APNSTestServer,
+            APNSBroadcastClient<JSONDecoder, JSONEncoder>,
+            APNSClient<JSONDecoder, JSONEncoder>
+        ) async throws -> T
+    ) async throws -> T {
+        try await TestFixtures.withServer { server in
+            let broadcastClient = APNSBroadcastClient(
+                authenticationMethod: try TestFixtures.jwtAuthentication(),
+                environment: .custom(url: "http://127.0.0.1", port: server.port),
+                bundleID: Self.bundleID,
+                eventLoopGroupProvider: .shared(MultiThreadedEventLoopGroup.singleton),
+                responseDecoder: JSONDecoder(),
+                requestEncoder: JSONEncoder()
+            )
+            let client = APNSClient(
+                configuration: .init(
+                    authenticationMethod: try TestFixtures.jwtAuthentication(),
+                    environment: .custom(url: "http://127.0.0.1", port: server.port)
+                ),
+                eventLoopGroupProvider: .shared(MultiThreadedEventLoopGroup.singleton),
+                responseDecoder: JSONDecoder(),
+                requestEncoder: JSONEncoder()
+            )
+            do {
+                let result = try await body(server, broadcastClient, client)
+                try await broadcastClient.shutdown()
+                try await client.shutdown()
+                return result
+            } catch {
+                try? await broadcastClient.shutdown()
+                try? await client.shutdown()
+                throw error
+            }
+        }
+    }
+
+    private static func createChannel(
+        using broadcastClient: APNSBroadcastClient<JSONDecoder, JSONEncoder>
+    ) async throws -> String {
         let channel = APNSBroadcastChannel(messageStoragePolicy: .mostRecentMessageStored)
         let response = try await broadcastClient.create(channel: channel, apnsRequestID: nil)
-        return try XCTUnwrap(response.channelID)
+        return try #require(response.channelID)
     }
 
     private static func makeUpdate() -> APNSLiveActivityNotification<ExampleContentState> {
@@ -266,13 +238,4 @@ final class APNSBroadcastSendTests: XCTestCase {
         }
         let aps: APS
     }
-
-    private static let jwtPrivateKey = """
-    -----BEGIN PRIVATE KEY-----
-    MIGTAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBHkwdwIBAQQg2sD+kukkA8GZUpmm
-    jRa4fJ9Xa/JnIG4Hpi7tNO66+OGgCgYIKoZIzj0DAQehRANCAATZp0yt0btpR9kf
-    ntp4oUUzTV0+eTELXxJxFvhnqmgwGAm1iVW132XLrdRG/ntlbQ1yzUuJkHtYBNve
-    y+77Vzsd
-    -----END PRIVATE KEY-----
-    """
 }

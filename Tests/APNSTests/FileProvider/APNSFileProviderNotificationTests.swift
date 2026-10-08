@@ -13,10 +13,10 @@
 //===----------------------------------------------------------------------===//
 
 import APNSCore
-import XCTest
+import Testing
 
-final class APNSFileProviderNotificationTests: XCTestCase {
-    func testAppID() {
+struct APNSFileProviderNotificationTests {
+    @Test func appID() {
         struct Payload: Encodable {
             let foo = "bar"
         }
@@ -26,6 +26,6 @@ final class APNSFileProviderNotificationTests: XCTestCase {
             payload: Payload()
         )
 
-        XCTAssertEqual(fileProviderNotification.topic, "com.example.app.pushkit.fileprovider")
+        #expect(fileProviderNotification.topic == "com.example.app.pushkit.fileprovider")
     }
 }

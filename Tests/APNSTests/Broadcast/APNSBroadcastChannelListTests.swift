@@ -13,31 +13,32 @@
 //===----------------------------------------------------------------------===//
 
 import APNSCore
-import XCTest
+import Foundation
+import Testing
 
-final class APNSBroadcastChannelListTests: XCTestCase {
-    func testDecode() throws {
+struct APNSBroadcastChannelListTests {
+    @Test func decode() throws {
         let jsonString = """
         {"channels":["channel-1","channel-2","channel-3"]}
         """
-        let data = jsonString.data(using: .utf8)!
+        let data = try #require(jsonString.data(using: .utf8))
         let decoder = JSONDecoder()
         let channelList = try decoder.decode(APNSBroadcastChannelList.self, from: data)
 
-        XCTAssertEqual(channelList.channels.count, 3)
-        XCTAssertEqual(channelList.channels[0], "channel-1")
-        XCTAssertEqual(channelList.channels[1], "channel-2")
-        XCTAssertEqual(channelList.channels[2], "channel-3")
+        #expect(channelList.channels.count == 3)
+        #expect(channelList.channels[0] == "channel-1")
+        #expect(channelList.channels[1] == "channel-2")
+        #expect(channelList.channels[2] == "channel-3")
     }
 
-    func testDecode_emptyList() throws {
+    @Test func `Decode empty list`() throws {
         let jsonString = """
         {"channels":[]}
         """
-        let data = jsonString.data(using: .utf8)!
+        let data = try #require(jsonString.data(using: .utf8))
         let decoder = JSONDecoder()
         let channelList = try decoder.decode(APNSBroadcastChannelList.self, from: data)
 
-        XCTAssertEqual(channelList.channels.count, 0)
+        #expect(channelList.channels.count == 0)
     }
 }

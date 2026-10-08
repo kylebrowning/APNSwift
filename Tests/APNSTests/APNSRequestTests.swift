@@ -13,14 +13,110 @@
 //===----------------------------------------------------------------------===//
 
 import APNSCore
-import XCTest
+import Foundation
+import Testing
 
 private struct TestMessage: APNSMessage {}
 
 /// Direct coverage of ``APNSCore.APNSRequest.headers``, which is the URLSession client's
 /// entire header contract.
-final class APNSRequestTests: XCTestCase {
-    func testSetters_roundTripEveryProperty() throws {
+struct APNSRequestTests {
+    @Test func `Full request emits all headers`() throws {
+        let apnsID = UUID()
+        let request = APNSRequest(
+            message: TestMessage(),
+            deviceToken: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            pushType: .alert,
+            expiration: .timeIntervalSince1970InSeconds(1_234_567_890),
+            priority: .immediately,
+            apnsID: apnsID,
+            topic: "com.example.app",
+            collapseID: "collapse-123"
+        )
+
+        let headers = request.headers
+
+        #expect(headers["apns-id"] == apnsID.uuidString.lowercased())
+        #expect(headers["apns-expiration"] == "1234567890")
+        #expect(headers["apns-priority"] == "10")
+        #expect(headers["apns-topic"] == "com.example.app")
+        #expect(headers["apns-collapse-id"] == "collapse-123")
+        #expect(headers["apns-push-type"] == "alert")
+    }
+
+    @Test func `apns-id header is lowercased`() throws {
+        // UUID() can produce uppercase hex; the header value must always be lowercased.
+        let apnsID = try #require(UUID(uuidString: "ABCDEF12-3456-7890-ABCD-EF1234567890"))
+        let request = APNSRequest(
+            message: TestMessage(),
+            deviceToken: "token",
+            pushType: .alert,
+            expiration: nil,
+            priority: nil,
+            apnsID: apnsID,
+            topic: nil,
+            collapseID: nil
+        )
+
+        #expect(request.headers["apns-id"] == "abcdef12-3456-7890-abcd-ef1234567890")
+    }
+
+    @Test func `Minimal request omits optional headers`() throws {
+        let request = APNSRequest(
+            message: TestMessage(),
+            deviceToken: "token",
+            pushType: .background,
+            expiration: nil,
+            priority: nil,
+            apnsID: nil,
+            topic: nil,
+            collapseID: nil
+        )
+
+        let headers = request.headers
+
+        #expect(headers["apns-push-type"] == "background")
+        #expect(headers["apns-id"] == nil)
+        #expect(headers["apns-expiration"] == nil)
+        #expect(headers["apns-priority"] == nil)
+        #expect(headers["apns-topic"] == nil)
+        #expect(headers["apns-collapse-id"] == nil)
+    }
+
+    @Test func `Expiration immediately is zero`() throws {
+        let request = APNSRequest(
+            message: TestMessage(),
+            deviceToken: "token",
+            pushType: .alert,
+            expiration: .immediately,
+            priority: nil,
+            apnsID: nil,
+            topic: nil,
+            collapseID: nil
+        )
+
+        #expect(request.headers["apns-expiration"] == "0")
+    }
+
+    @Test func `Expiration none omits header`() throws {
+        // `APNSNotificationExpiration.none` (as opposed to a `nil` `APNSRequest.expiration`)
+        // must also omit the header.
+        let noneExpiration: APNSNotificationExpiration? = APNSNotificationExpiration.none
+        let request = APNSRequest(
+            message: TestMessage(),
+            deviceToken: "token",
+            pushType: .alert,
+            expiration: noneExpiration,
+            priority: nil,
+            apnsID: nil,
+            topic: nil,
+            collapseID: nil
+        )
+
+        #expect(request.headers["apns-expiration"] == nil)
+    }
+
+    @Test func `Setters round trip every property`() {
         var request = APNSRequest(
             message: TestMessage(),
             deviceToken: "token",
@@ -42,16 +138,16 @@ final class APNSRequestTests: XCTestCase {
         request.topic = "com.example.app"
         request.collapseID = "collapse"
 
-        XCTAssertEqual(request.deviceToken, "other-token")
-        XCTAssertEqual(request.pushType, .background)
-        XCTAssertEqual(request.expiration, .immediately)
-        XCTAssertEqual(request.priority, .consideringDevicePower)
-        XCTAssertEqual(request.apnsID, apnsID)
-        XCTAssertEqual(request.topic, "com.example.app")
-        XCTAssertEqual(request.collapseID, "collapse")
+        #expect(request.deviceToken == "other-token")
+        #expect(request.pushType == .background)
+        #expect(request.expiration == .immediately)
+        #expect(request.priority == .consideringDevicePower)
+        #expect(request.apnsID == apnsID)
+        #expect(request.topic == "com.example.app")
+        #expect(request.collapseID == "collapse")
     }
 
-    func testCopyOnWrite_mutatingACopyDoesNotAffectTheOriginal() throws {
+    @Test func `Mutating a copy does not affect the original`() {
         let original = APNSRequest(
             message: TestMessage(),
             deviceToken: "original-token",
@@ -72,42 +168,19 @@ final class APNSRequestTests: XCTestCase {
         copy.topic = "com.example.app.voip"
         copy.collapseID = "collapse"
 
-        XCTAssertEqual(original.deviceToken, "original-token")
-        XCTAssertEqual(original.pushType, .alert)
-        XCTAssertEqual(original.expiration, .immediately)
-        XCTAssertEqual(original.priority, .immediately)
-        XCTAssertNil(original.apnsID)
-        XCTAssertEqual(original.topic, "com.example.app")
-        XCTAssertNil(original.collapseID)
-        XCTAssertEqual(copy.deviceToken, "copy-token")
-        XCTAssertEqual(copy.headers["apns-push-type"], "voip")
-        XCTAssertNil(copy.headers["apns-expiration"])
+        #expect(original.deviceToken == "original-token")
+        #expect(original.pushType == .alert)
+        #expect(original.expiration == .immediately)
+        #expect(original.priority == .immediately)
+        #expect(original.apnsID == nil)
+        #expect(original.topic == "com.example.app")
+        #expect(original.collapseID == nil)
+        #expect(copy.deviceToken == "copy-token")
+        #expect(copy.headers["apns-push-type"] == "voip")
+        #expect(copy.headers["apns-expiration"] == nil)
     }
 
-    func testHeaders_fullRequestEmitsAllHeaders() throws {
-        let apnsID = UUID()
-        let request = APNSRequest(
-            message: TestMessage(),
-            deviceToken: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-            pushType: .alert,
-            expiration: .timeIntervalSince1970InSeconds(1_234_567_890),
-            priority: .immediately,
-            apnsID: apnsID,
-            topic: "com.example.app",
-            collapseID: "collapse-123"
-        )
-
-        let headers = request.headers
-
-        XCTAssertEqual(headers["apns-id"], apnsID.uuidString.lowercased())
-        XCTAssertEqual(headers["apns-expiration"], "1234567890")
-        XCTAssertEqual(headers["apns-priority"], "10")
-        XCTAssertEqual(headers["apns-topic"], "com.example.app")
-        XCTAssertEqual(headers["apns-collapse-id"], "collapse-123")
-        XCTAssertEqual(headers["apns-push-type"], "alert")
-    }
-
-    func testHeaders_accessoryPushType() throws {
+    @Test func `Accessory push type header`() {
         let request = APNSRequest(
             message: TestMessage(),
             deviceToken: "token",
@@ -119,79 +192,8 @@ final class APNSRequestTests: XCTestCase {
             collapseID: nil
         )
 
-        XCTAssertEqual(request.headers["apns-push-type"], "accessory")
-        XCTAssertEqual(request.headers["apns-topic"], "com.example.app.push-type.accessory")
+        #expect(request.headers["apns-push-type"] == "accessory")
+        #expect(request.headers["apns-topic"] == "com.example.app.push-type.accessory")
     }
 
-    func testHeaders_apnsIDIsLowercased() throws {
-        // UUID() can produce uppercase hex; the header value must always be lowercased.
-        let apnsID = UUID(uuidString: "ABCDEF12-3456-7890-ABCD-EF1234567890")!
-        let request = APNSRequest(
-            message: TestMessage(),
-            deviceToken: "token",
-            pushType: .alert,
-            expiration: nil,
-            priority: nil,
-            apnsID: apnsID,
-            topic: nil,
-            collapseID: nil
-        )
-
-        XCTAssertEqual(request.headers["apns-id"], "abcdef12-3456-7890-abcd-ef1234567890")
-    }
-
-    func testHeaders_minimalRequestOmitsOptionalHeaders() throws {
-        let request = APNSRequest(
-            message: TestMessage(),
-            deviceToken: "token",
-            pushType: .background,
-            expiration: nil,
-            priority: nil,
-            apnsID: nil,
-            topic: nil,
-            collapseID: nil
-        )
-
-        let headers = request.headers
-
-        XCTAssertEqual(headers["apns-push-type"], "background")
-        XCTAssertNil(headers["apns-id"])
-        XCTAssertNil(headers["apns-expiration"])
-        XCTAssertNil(headers["apns-priority"])
-        XCTAssertNil(headers["apns-topic"])
-        XCTAssertNil(headers["apns-collapse-id"])
-    }
-
-    func testHeaders_expirationImmediatelyIsZero() throws {
-        let request = APNSRequest(
-            message: TestMessage(),
-            deviceToken: "token",
-            pushType: .alert,
-            expiration: .immediately,
-            priority: nil,
-            apnsID: nil,
-            topic: nil,
-            collapseID: nil
-        )
-
-        XCTAssertEqual(request.headers["apns-expiration"], "0")
-    }
-
-    func testHeaders_expirationNoneOmitsHeader() throws {
-        // `APNSNotificationExpiration.none` (as opposed to a `nil` `APNSRequest.expiration`)
-        // must also omit the header.
-        let noneExpiration: APNSNotificationExpiration? = APNSNotificationExpiration.none
-        let request = APNSRequest(
-            message: TestMessage(),
-            deviceToken: "token",
-            pushType: .alert,
-            expiration: noneExpiration,
-            priority: nil,
-            apnsID: nil,
-            topic: nil,
-            collapseID: nil
-        )
-
-        XCTAssertNil(request.headers["apns-expiration"])
-    }
 }

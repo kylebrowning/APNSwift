@@ -14,52 +14,46 @@
 
 @testable import APNSCore
 import APNS
-import Crypto
+import Foundation
+import NIOPosix
 import NIOSSL
-import XCTest
+import Testing
 
-final class APNSClientTests: XCTestCase {
-    func testShutdown() async throws {
-        let client = self.makeClient()
+struct APNSClientTests {
+    @Test func shutdown() async throws {
+        let client = try makeClient()
         try await client.shutdown()
     }
 
-    func testTLSAuthentication_constructsAndShutsDown() async throws {
-        let privateKey = try NIOSSLPrivateKey(bytes: Array(self.jwtPrivateKey.utf8), format: .pem)
+    @Test func `TLS authentication constructs and shuts down`() async throws {
+        let privateKey = try NIOSSLPrivateKey(bytes: Array(TestFixtures.jwtPrivateKey.utf8), format: .pem)
         let client = APNSClient(
             configuration: .init(
                 authenticationMethod: .tls(privateKey: .privateKey(privateKey), certificateChain: []),
                 environment: .development
             ),
-            eventLoopGroupProvider: .createNew,
+            eventLoopGroupProvider: .shared(MultiThreadedEventLoopGroup.singleton),
             responseDecoder: JSONDecoder(),
             requestEncoder: JSONEncoder()
         )
         try await client.shutdown()
     }
 
-    func testResponseDescription() {
-        let apnsID = UUID(uuidString: "ABCDEF12-3456-7890-ABCD-EF1234567890")!
-        XCTAssertEqual(
-            APNSResponse(apnsID: apnsID).description,
-            "APNSResponse(apns-id: abcdef12-3456-7890-abcd-ef1234567890, apns-unique-id: nil)"
+    @Test func `Response description`() throws {
+        let apnsID = try #require(UUID(uuidString: "ABCDEF12-3456-7890-ABCD-EF1234567890"))
+        #expect(
+            APNSResponse(apnsID: apnsID).description
+                == "APNSResponse(apns-id: abcdef12-3456-7890-abcd-ef1234567890, apns-unique-id: nil)"
         )
-        XCTAssertEqual(
-            APNSResponse().description,
-            "APNSResponse(apns-id: nil, apns-unique-id: nil)"
-        )
+        #expect(APNSResponse().description == "APNSResponse(apns-id: nil, apns-unique-id: nil)")
     }
 
     // MARK: - Helper methods
 
-    private func makeClient() -> APNSClient<JSONDecoder, JSONEncoder> {
+    private func makeClient() throws -> APNSClient<JSONDecoder, JSONEncoder> {
         APNSClient(
             configuration: .init(
-                authenticationMethod: .jwt(
-                    privateKey: try! P256.Signing.PrivateKey(pemRepresentation: self.jwtPrivateKey),
-                    keyIdentifier: "MY_KEY_ID",
-                    teamIdentifier: "MY_TEAM_ID"
-                ),
+                authenticationMethod: try TestFixtures.jwtAuthentication(),
                 environment: .development
             ),
             eventLoopGroupProvider: .createNew,
@@ -67,15 +61,6 @@ final class APNSClientTests: XCTestCase {
             requestEncoder: JSONEncoder()
         )
     }
-
-    private let jwtPrivateKey = """
-    -----BEGIN PRIVATE KEY-----
-    MIGTAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBHkwdwIBAQQg2sD+kukkA8GZUpmm
-    jRa4fJ9Xa/JnIG4Hpi7tNO66+OGgCgYIKoZIzj0DAQehRANCAATZp0yt0btpR9kf
-    ntp4oUUzTV0+eTELXxJxFvhnqmgwGAm1iVW132XLrdRG/ntlbQ1yzUuJkHtYBNve
-    y+77Vzsd
-    -----END PRIVATE KEY-----
-    """
 }
 
 // This doesn't perform any runtime tests, it just ensures the call to sendAlertNotification

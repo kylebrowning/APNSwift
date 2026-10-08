@@ -13,44 +13,37 @@
 //===----------------------------------------------------------------------===//
 
 import APNSCore
-import XCTest
+import Foundation
+import Testing
 
-final class APNSBroadcastChannelTests: XCTestCase {
-    func testEncode() throws {
-        let channel = APNSBroadcastChannel(messageStoragePolicy: .mostRecentMessageStored)
+struct APNSBroadcastChannelTests {
+    @Test(arguments: [
+        (APNSBroadcastMessageStoragePolicy.mostRecentMessageStored, 1),
+        (APNSBroadcastMessageStoragePolicy.noMessageStored, 0),
+    ])
+    func encode(policy: APNSBroadcastMessageStoragePolicy, rawPolicy: Int) throws {
+        let channel = APNSBroadcastChannel(messageStoragePolicy: policy)
         let encoder = JSONEncoder()
         let data = try encoder.encode(channel)
 
         let expectedJSONString = """
-        {"message-storage-policy":1,"push-type":"LiveActivity"}
+        {"message-storage-policy":\(rawPolicy),"push-type":"LiveActivity"}
         """
-        let jsonObject1 = try JSONSerialization.jsonObject(with: data) as! NSDictionary
-        let jsonObject2 = try JSONSerialization.jsonObject(with: expectedJSONString.data(using: .utf8)!) as! NSDictionary
-        XCTAssertEqual(jsonObject1, jsonObject2)
+        let expectedData = try #require(expectedJSONString.data(using: .utf8))
+        let jsonObject1 = try #require(JSONSerialization.jsonObject(with: data) as? NSDictionary)
+        let jsonObject2 = try #require(JSONSerialization.jsonObject(with: expectedData) as? NSDictionary)
+        #expect(jsonObject1 == jsonObject2)
     }
 
-    func testEncode_noMessageStored() throws {
-        let channel = APNSBroadcastChannel(messageStoragePolicy: .noMessageStored)
-        let encoder = JSONEncoder()
-        let data = try encoder.encode(channel)
-
-        let expectedJSONString = """
-        {"message-storage-policy":0,"push-type":"LiveActivity"}
-        """
-        let jsonObject1 = try JSONSerialization.jsonObject(with: data) as! NSDictionary
-        let jsonObject2 = try JSONSerialization.jsonObject(with: expectedJSONString.data(using: .utf8)!) as! NSDictionary
-        XCTAssertEqual(jsonObject1, jsonObject2)
-    }
-
-    func testDecode() throws {
+    @Test func decode() throws {
         let jsonString = """
         {"message-storage-policy":1,"push-type":"LiveActivity"}
         """
-        let data = jsonString.data(using: .utf8)!
+        let data = try #require(jsonString.data(using: .utf8))
         let decoder = JSONDecoder()
         let channel = try decoder.decode(APNSBroadcastChannel.self, from: data)
 
-        XCTAssertEqual(channel.messageStoragePolicy, .mostRecentMessageStored)
-        XCTAssertEqual(channel.pushType, "LiveActivity")
+        #expect(channel.messageStoragePolicy == .mostRecentMessageStored)
+        #expect(channel.pushType == "LiveActivity")
     }
 }

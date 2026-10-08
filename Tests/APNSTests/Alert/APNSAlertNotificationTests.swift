@@ -13,96 +13,11 @@
 //===----------------------------------------------------------------------===//
 
 import APNSCore
-import XCTest
+import Foundation
+import Testing
 
-final class APNSAlertNotificationTests: XCTestCase {
-    func testSetters_areReflectedInEncodedAPS() throws {
-        var notification = APNSAlertNotification(
-            alert: .init(title: .raw("title")),
-            expiration: .immediately,
-            priority: .immediately,
-            topic: "com.example.app"
-        )
-
-        notification.alert = .init(title: .raw("new title"), body: .raw("body"))
-        notification.badge = 3
-        notification.sound = .default
-        notification.threadID = "thread"
-        notification.category = "category"
-        notification.mutableContent = 1
-        notification.targetContentID = "target"
-        notification.interruptionLevel = .timeSensitive
-        notification.relevanceScore = 0.5
-        notification.filterCriteria = "filter"
-
-        XCTAssertEqual(notification.badge, 3)
-        XCTAssertEqual(notification.sound, .default)
-        XCTAssertEqual(notification.threadID, "thread")
-        XCTAssertEqual(notification.category, "category")
-        XCTAssertEqual(notification.mutableContent, 1)
-        XCTAssertEqual(notification.targetContentID, "target")
-        XCTAssertEqual(notification.interruptionLevel, .timeSensitive)
-        XCTAssertEqual(notification.relevanceScore, 0.5)
-        XCTAssertEqual(notification.filterCriteria, "filter")
-
-        let data = try JSONEncoder().encode(notification)
-        let expectedJSONString = """
-        {"aps":{
-          "alert":{"title":"new title","body":"body"},
-          "badge":3,
-          "sound":"default",
-          "thread-id":"thread",
-          "category":"category",
-          "mutable-content":1,
-          "target-content-id":"target",
-          "interruption-level":"time-sensitive",
-          "relevance-score":0.5,
-          "filter-criteria":"filter"
-        }}
-        """
-        let jsonObject1 = try JSONSerialization.jsonObject(with: data) as! NSDictionary
-        let jsonObject2 = try JSONSerialization.jsonObject(with: expectedJSONString.data(using: .utf8)!) as! NSDictionary
-        XCTAssertEqual(jsonObject1, jsonObject2)
-    }
-
-    func testEmptyPayloadInit_encodesEveryAPSField() throws {
-        let notification = APNSAlertNotification(
-            alert: .init(title: .raw("title")),
-            expiration: .immediately,
-            priority: .immediately,
-            topic: "com.example.app",
-            badge: 1,
-            sound: .default,
-            threadID: "thread",
-            category: "category",
-            mutableContent: 1,
-            targetContentID: "target",
-            interruptionLevel: .critical,
-            relevanceScore: 1,
-            filterCriteria: "filter"
-        )
-
-        let data = try JSONEncoder().encode(notification)
-        let expectedJSONString = """
-        {"aps":{
-          "alert":{"title":"title"},
-          "badge":1,
-          "sound":"default",
-          "thread-id":"thread",
-          "category":"category",
-          "mutable-content":1,
-          "target-content-id":"target",
-          "interruption-level":"critical",
-          "relevance-score":1,
-          "filter-criteria":"filter"
-        }}
-        """
-        let jsonObject1 = try JSONSerialization.jsonObject(with: data) as! NSDictionary
-        let jsonObject2 = try JSONSerialization.jsonObject(with: expectedJSONString.data(using: .utf8)!) as! NSDictionary
-        XCTAssertEqual(jsonObject1, jsonObject2)
-    }
-
-    func testEncode() throws {
+struct APNSAlertNotificationTests {
+    @Test func encode() throws {
         struct Payload: Encodable {
             let foo = "bar"
         }
@@ -119,12 +34,12 @@ final class APNSAlertNotificationTests: XCTestCase {
         let expectedJSONString = """
         {"foo":"bar","aps":{"alert":{"title":"title"}}}
         """
-        let jsonObject1 = try JSONSerialization.jsonObject(with: data) as! NSDictionary
-        let jsonObject2 = try JSONSerialization.jsonObject(with: expectedJSONString.data(using: .utf8)!) as! NSDictionary
-        XCTAssertEqual(jsonObject1, jsonObject2)
+        let jsonObject1 = try #require(JSONSerialization.jsonObject(with: data) as? NSDictionary)
+        let jsonObject2 = try #require(JSONSerialization.jsonObject(with: Data(expectedJSONString.utf8)) as? NSDictionary)
+        #expect(jsonObject1 == jsonObject2)
     }
 
-    func testEncode_whenAPSKeyInPayload() throws {
+    @Test func `Encode when APS key in payload`() throws {
         struct Payload: Encodable {
             let aps = "foo"
         }
@@ -141,12 +56,12 @@ final class APNSAlertNotificationTests: XCTestCase {
         let expectedJSONString = """
         {"aps":{"alert":{"title":"title"}}}
         """
-        let jsonObject1 = try JSONSerialization.jsonObject(with: data) as! NSDictionary
-        let jsonObject2 = try JSONSerialization.jsonObject(with: expectedJSONString.data(using: .utf8)!) as! NSDictionary
-        XCTAssertEqual(jsonObject1, jsonObject2)
+        let jsonObject1 = try #require(JSONSerialization.jsonObject(with: data) as? NSDictionary)
+        let jsonObject2 = try #require(JSONSerialization.jsonObject(with: Data(expectedJSONString.utf8)) as? NSDictionary)
+        #expect(jsonObject1 == jsonObject2)
     }
 
-    func testEncode_whenDefaultSound() throws {
+    @Test func `Encode when default sound`() throws {
         struct Payload: Encodable {
             let payload = "payload"
         }
@@ -180,12 +95,12 @@ final class APNSAlertNotificationTests: XCTestCase {
         let expectedJSONString = """
         {\"payload\":\"payload\",\"aps\":{\"category\":\"category\",\"relevance-score\":1,\"badge\":1,\"target-content-id\":\"targetContentID\",\"sound\":\"default\",\"interruption-level\":\"critical\",\"alert\":{\"body\":\"body\",\"subtitle-loc-key\":\"subtitle-key\",\"title\":\"title\",\"launch-image\":\"launchimage\",\"subtitle-loc-args\":[\"arg1\"]},\"thread-id\":\"threadID\",\"mutable-content\":1}}
         """
-        let jsonObject1 = try JSONSerialization.jsonObject(with: data) as! NSDictionary
-        let jsonObject2 = try JSONSerialization.jsonObject(with: expectedJSONString.data(using: .utf8)!) as! NSDictionary
-        XCTAssertEqual(jsonObject1, jsonObject2)
+        let jsonObject1 = try #require(JSONSerialization.jsonObject(with: data) as? NSDictionary)
+        let jsonObject2 = try #require(JSONSerialization.jsonObject(with: Data(expectedJSONString.utf8)) as? NSDictionary)
+        #expect(jsonObject1 == jsonObject2)
     }
 
-    func testEncode_whenCriticalSound() throws {
+    @Test func `Encode when critical sound`() throws {
         struct Payload: Encodable {
             let payload = "payload"
         }
@@ -219,12 +134,12 @@ final class APNSAlertNotificationTests: XCTestCase {
         let expectedJSONString = """
         {\"payload\":\"payload\",\"aps\":{\"category\":\"category\",\"relevance-score\":1,\"badge\":1,\"target-content-id\":\"targetContentID\",\"sound\":{\"name\":\"file\",\"volume\":1,\"critical\":1},\"interruption-level\":\"critical\",\"alert\":{\"body\":\"body\",\"subtitle-loc-key\":\"subtitle-key\",\"title\":\"title\",\"launch-image\":\"launchimage\",\"subtitle-loc-args\":[\"arg1\"]},\"thread-id\":\"threadID\",\"mutable-content\":1}}
         """
-        let jsonObject1 = try JSONSerialization.jsonObject(with: data) as! NSDictionary
-        let jsonObject2 = try JSONSerialization.jsonObject(with: expectedJSONString.data(using: .utf8)!) as! NSDictionary
-        XCTAssertEqual(jsonObject1, jsonObject2)
+        let jsonObject1 = try #require(JSONSerialization.jsonObject(with: data) as? NSDictionary)
+        let jsonObject2 = try #require(JSONSerialization.jsonObject(with: Data(expectedJSONString.utf8)) as? NSDictionary)
+        #expect(jsonObject1 == jsonObject2)
     }
 
-    func testEncode_whenFilterCriteria() throws {
+    @Test func `Encode when filter criteria`() throws {
         struct Payload: Encodable {
             let payload = "payload"
         }
@@ -259,12 +174,12 @@ final class APNSAlertNotificationTests: XCTestCase {
         let expectedJSONString = """
         {\"payload\":\"payload\",\"aps\":{\"category\":\"category\",\"relevance-score\":1,\"filter-criteria\":\"user123\",\"badge\":1,\"target-content-id\":\"targetContentID\",\"sound\":\"default\",\"interruption-level\":\"critical\",\"alert\":{\"body\":\"body\",\"subtitle-loc-key\":\"subtitle-key\",\"title\":\"title\",\"launch-image\":\"launchimage\",\"subtitle-loc-args\":[\"arg1\"]},\"thread-id\":\"threadID\",\"mutable-content\":1}}
         """
-        let jsonObject1 = try JSONSerialization.jsonObject(with: data) as! NSDictionary
-        let jsonObject2 = try JSONSerialization.jsonObject(with: expectedJSONString.data(using: .utf8)!) as! NSDictionary
-        XCTAssertEqual(jsonObject1, jsonObject2)
+        let jsonObject1 = try #require(JSONSerialization.jsonObject(with: data) as? NSDictionary)
+        let jsonObject2 = try #require(JSONSerialization.jsonObject(with: Data(expectedJSONString.utf8)) as? NSDictionary)
+        #expect(jsonObject1 == jsonObject2)
     }
 
-    func testEncode_whenLocalizedTitleAndBody() throws {
+    @Test func `Encode when localized title and body`() throws {
         struct Payload: Encodable {
             let foo = "bar"
         }
@@ -284,16 +199,16 @@ final class APNSAlertNotificationTests: XCTestCase {
         let expectedJSONString = """
         {"foo":"bar","aps":{"alert":{"title-loc-key":"title-key","title-loc-args":["title-arg"],"loc-key":"body-key","loc-args":["body-arg1","body-arg2"]}}}
         """
-        let jsonObject1 = try JSONSerialization.jsonObject(with: data) as! NSDictionary
-        let jsonObject2 = try JSONSerialization.jsonObject(with: expectedJSONString.data(using: .utf8)!) as! NSDictionary
-        XCTAssertEqual(jsonObject1, jsonObject2)
+        let jsonObject1 = try #require(JSONSerialization.jsonObject(with: data) as? NSDictionary)
+        let jsonObject2 = try #require(JSONSerialization.jsonObject(with: Data(expectedJSONString.utf8)) as? NSDictionary)
+        #expect(jsonObject1 == jsonObject2)
 
-        let alertDict = try XCTUnwrap((jsonObject1["aps"] as? NSDictionary)?["alert"] as? NSDictionary)
-        XCTAssertNil(alertDict["title"])
-        XCTAssertNil(alertDict["body"])
+        let alertDict = try #require((jsonObject1["aps"] as? NSDictionary)?["alert"] as? NSDictionary)
+        #expect(alertDict["title"] == nil)
+        #expect(alertDict["body"] == nil)
     }
 
-    func testEncode_whenFileNameSound() throws {
+    @Test func `Encode when file name sound`() throws {
         struct Payload: Encodable {
             let foo = "bar"
         }
@@ -311,40 +226,123 @@ final class APNSAlertNotificationTests: XCTestCase {
         let expectedJSONString = """
         {"foo":"bar","aps":{"alert":{"title":"title"},"sound":"horn.aiff"}}
         """
-        let jsonObject1 = try JSONSerialization.jsonObject(with: data) as! NSDictionary
-        let jsonObject2 = try JSONSerialization.jsonObject(with: expectedJSONString.data(using: .utf8)!) as! NSDictionary
-        XCTAssertEqual(jsonObject1, jsonObject2)
+        let jsonObject1 = try #require(JSONSerialization.jsonObject(with: data) as? NSDictionary)
+        let jsonObject2 = try #require(JSONSerialization.jsonObject(with: Data(expectedJSONString.utf8)) as? NSDictionary)
+        #expect(jsonObject1 == jsonObject2)
 
-        let aps = try XCTUnwrap(jsonObject1["aps"] as? NSDictionary)
-        XCTAssertEqual(aps["sound"] as? String, "horn.aiff")
+        let aps = try #require(jsonObject1["aps"] as? NSDictionary)
+        #expect(aps["sound"] as? String == "horn.aiff")
     }
 
-    func testEncode_interruptionLevels() throws {
+    @Test(arguments: [
+        (APNSAlertNotificationInterruptionLevel.passive, "passive"),
+        (.active, "active"),
+        (.timeSensitive, "time-sensitive"),
+    ])
+    func `Encode interruption levels`(level: APNSAlertNotificationInterruptionLevel, expectedRawValue: String) throws {
         struct Payload: Encodable {
             let foo = "bar"
         }
+        let notification = APNSAlertNotification(
+            alert: .init(title: .raw("title")),
+            expiration: .immediately,
+            priority: .immediately,
+            topic: "",
+            payload: Payload(),
+            interruptionLevel: level
+        )
+        let encoder = JSONEncoder()
+        let data = try encoder.encode(notification)
 
-        let levels: [(APNSAlertNotificationInterruptionLevel, String)] = [
-            (.passive, "passive"),
-            (.active, "active"),
-            (.timeSensitive, "time-sensitive"),
-        ]
-
-        for (level, expectedRawValue) in levels {
-            let notification = APNSAlertNotification(
-                alert: .init(title: .raw("title")),
-                expiration: .immediately,
-                priority: .immediately,
-                topic: "",
-                payload: Payload(),
-                interruptionLevel: level
-            )
-            let encoder = JSONEncoder()
-            let data = try encoder.encode(notification)
-
-            let jsonObject = try JSONSerialization.jsonObject(with: data) as! NSDictionary
-            let aps = try XCTUnwrap(jsonObject["aps"] as? NSDictionary)
-            XCTAssertEqual(aps["interruption-level"] as? String, expectedRawValue)
-        }
+        let jsonObject = try #require(JSONSerialization.jsonObject(with: data) as? NSDictionary)
+        let aps = try #require(jsonObject["aps"] as? NSDictionary)
+        #expect(aps["interruption-level"] as? String == expectedRawValue)
     }
+
+    @Test func `Setters are reflected in encoded APS`() throws {
+        var notification = APNSAlertNotification(
+            alert: .init(title: .raw("title")),
+            expiration: .immediately,
+            priority: .immediately,
+            topic: "com.example.app"
+        )
+
+        notification.alert = .init(title: .raw("new title"), body: .raw("body"))
+        notification.badge = 3
+        notification.sound = .default
+        notification.threadID = "thread"
+        notification.category = "category"
+        notification.mutableContent = 1
+        notification.targetContentID = "target"
+        notification.interruptionLevel = .timeSensitive
+        notification.relevanceScore = 0.5
+        notification.filterCriteria = "filter"
+
+        #expect(notification.badge == 3)
+        #expect(notification.sound == .default)
+        #expect(notification.threadID == "thread")
+        #expect(notification.category == "category")
+        #expect(notification.mutableContent == 1)
+        #expect(notification.targetContentID == "target")
+        #expect(notification.interruptionLevel == .timeSensitive)
+        #expect(notification.relevanceScore == 0.5)
+        #expect(notification.filterCriteria == "filter")
+
+        let data = try JSONEncoder().encode(notification)
+        let expectedJSONString = """
+        {"aps":{
+          "alert":{"title":"new title","body":"body"},
+          "badge":3,
+          "sound":"default",
+          "thread-id":"thread",
+          "category":"category",
+          "mutable-content":1,
+          "target-content-id":"target",
+          "interruption-level":"time-sensitive",
+          "relevance-score":0.5,
+          "filter-criteria":"filter"
+        }}
+        """
+        let jsonObject1 = try #require(JSONSerialization.jsonObject(with: data) as? NSDictionary)
+        let jsonObject2 = try #require(JSONSerialization.jsonObject(with: Data(expectedJSONString.utf8)) as? NSDictionary)
+        #expect(jsonObject1 == jsonObject2)
+    }
+
+    @Test func `Empty payload init encodes every APS field`() throws {
+        let notification = APNSAlertNotification(
+            alert: .init(title: .raw("title")),
+            expiration: .immediately,
+            priority: .immediately,
+            topic: "com.example.app",
+            badge: 1,
+            sound: .default,
+            threadID: "thread",
+            category: "category",
+            mutableContent: 1,
+            targetContentID: "target",
+            interruptionLevel: .critical,
+            relevanceScore: 1,
+            filterCriteria: "filter"
+        )
+
+        let data = try JSONEncoder().encode(notification)
+        let expectedJSONString = """
+        {"aps":{
+          "alert":{"title":"title"},
+          "badge":1,
+          "sound":"default",
+          "thread-id":"thread",
+          "category":"category",
+          "mutable-content":1,
+          "target-content-id":"target",
+          "interruption-level":"critical",
+          "relevance-score":1,
+          "filter-criteria":"filter"
+        }}
+        """
+        let jsonObject1 = try #require(JSONSerialization.jsonObject(with: data) as? NSDictionary)
+        let jsonObject2 = try #require(JSONSerialization.jsonObject(with: Data(expectedJSONString.utf8)) as? NSDictionary)
+        #expect(jsonObject1 == jsonObject2)
+    }
+
 }
