@@ -2,8 +2,11 @@ import APNSCore
 import Foundation
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 
-enum APNSUrlSessionClientError: Error {
+public enum APNSUrlSessionClientError: Error, Equatable {
+    /// The response from `URLSession` was not an `HTTPURLResponse`.
     case urlResponseNotFound
+    /// The request URL could not be formed, e.g. because the device token or bundle ID contains invalid characters.
+    case invalidURL(String)
 }
 
 public struct APNSURLSessionClient: APNSClientProtocol {
@@ -26,7 +29,11 @@ public struct APNSURLSessionClient: APNSClientProtocol {
     ) async throws -> APNSResponse {
         
         /// Construct URL
-        var urlRequest = URLRequest(url: URL(string: configuration.environment.absoluteURL + "/\(request.deviceToken)")!)
+        let urlString = configuration.environment.absoluteURL + "/\(request.deviceToken)"
+        guard let url = URL(string: urlString) else {
+            throw APNSUrlSessionClientError.invalidURL(urlString)
+        }
+        var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "POST"
         /// Set headers
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -81,10 +88,15 @@ public struct APNSURLSessionClient: APNSClientProtocol {
     ) async throws -> APNSBroadcastSendResponse {
 
         /// Construct URL
-        var urlRequest = URLRequest(url: URL(string: configuration.environment.broadcastSendURL(bundleID: request.bundleID))!)
+        let urlString = configuration.environment.broadcastSendURL(bundleID: request.bundleID)
+        guard let url = URL(string: urlString) else {
+            throw APNSUrlSessionClientError.invalidURL(urlString)
+        }
+        var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = "POST"
         /// Set headers
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.setValue("APNS/swift-urlsession", forHTTPHeaderField: "user-agent")
         for (header, value) in request.headers {
             urlRequest.setValue(value, forHTTPHeaderField: header)
         }
@@ -95,7 +107,7 @@ public struct APNSURLSessionClient: APNSClientProtocol {
         urlRequest.httpBody = try encoder.encode(request.message)
 
         /// Make request
-        let (data, response) = try await URLSession.shared.data(for: urlRequest)
+        let (data, response) = try await session.data(for: urlRequest)
 
         /// Unwrap response
         guard let response = response as? HTTPURLResponse else {

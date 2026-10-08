@@ -167,6 +167,44 @@ final class APNSBroadcastSendTests: XCTestCase {
     }
     #endif
 
+    func testSendBroadcast_forced503NonJSONBody_yieldsTypedErrorWithNilReason() async throws {
+        let channelID = try await createChannel()
+        server.setResponseOverride(.init(status: 503, body: "<html>unavailable</html>"))
+
+        do {
+            _ = try await client.sendBroadcastLiveActivityNotification(
+                Self.makeUpdate(),
+                channelID: channelID,
+                bundleID: Self.bundleID
+            )
+            XCTFail("Expected an APNSError to be thrown")
+        } catch let error as APNSError {
+            XCTAssertEqual(error.responseStatus, 503)
+            XCTAssertNil(error.reason)
+        } catch {
+            XCTFail("Expected an APNSError, got \(type(of: error)): \(error)")
+        }
+    }
+
+    func testSendBroadcast_forced500EmptyBody_yieldsTypedErrorWithNilReason() async throws {
+        let channelID = try await createChannel()
+        server.setResponseOverride(.init(status: 500))
+
+        do {
+            _ = try await client.sendBroadcastLiveActivityNotification(
+                Self.makeUpdate(),
+                channelID: channelID,
+                bundleID: Self.bundleID
+            )
+            XCTFail("Expected an APNSError to be thrown")
+        } catch let error as APNSError {
+            XCTAssertEqual(error.responseStatus, 500)
+            XCTAssertNil(error.reason)
+        } catch {
+            XCTFail("Expected an APNSError, got \(type(of: error)): \(error)")
+        }
+    }
+
     func testSendBroadcast_payloadTooLarge() async throws {
         let channelID = try await createChannel()
 

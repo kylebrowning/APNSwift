@@ -118,6 +118,26 @@ final class APNSAuthenticationTokenManagerTests: XCTestCase {
         XCTAssertFalse(payload.contains("\"kid\""), "kid must not be duplicated into the payload")
     }
 
+    /// Identifiers containing JSON-significant characters must be escaped so the token stays well-formed.
+    func testIdentifiersWithQuotesAndBackslashesProduceValidJSON() async throws {
+        let manager = APNSAuthenticationTokenManager(
+            privateKey: try .init(pemRepresentation: Self.signingKey),
+            teamIdentifier: "TEAM\"ID\\",
+            keyIdentifier: "KEY\"ID",
+            clock: clock
+        )
+        let token = try await manager.nextValidToken
+        let segments = try XCTUnwrap(token.split(separator: " ").last).split(separator: ".")
+
+        struct Header: Decodable { let kid: String }
+        struct Payload: Decodable { let iss: String }
+        let header = try JSONDecoder().decode(Header.self, from: XCTUnwrap(base64URLDecoded(String(segments[0]))))
+        let payload = try JSONDecoder().decode(Payload.self, from: XCTUnwrap(base64URLDecoded(String(segments[1]))))
+
+        XCTAssertEqual(header.kid, "KEY\"ID")
+        XCTAssertEqual(payload.iss, "TEAM\"ID\\")
+    }
+
     private func decodeSegment(_ segment: Substring) throws -> String {
         let data = try XCTUnwrap(base64URLDecoded(String(segment)))
         return try XCTUnwrap(String(data: data, encoding: .utf8))

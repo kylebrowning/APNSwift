@@ -342,6 +342,28 @@ final class APNSClientIntegrationTests: XCTestCase {
         XCTAssertEqual(jsonObject1, jsonObject2)
     }
 
+    // MARK: - Controls Notifications
+
+    func testSendControlsNotification() async throws {
+        let notification = APNSControlsNotification(appID: "com.example.app")
+
+        _ = try await client.sendControlsNotification(
+            notification,
+            deviceToken: "aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111"
+        )
+
+        let sent = try XCTUnwrap(server.getSentNotifications().first)
+        XCTAssertEqual(sent.pushType, "controls")
+        XCTAssertEqual(sent.topic, "com.example.app.push-type.controls")
+
+        let expectedJSONString = """
+        {"aps":{"content-changed":true}}
+        """
+        let jsonObject1 = try JSONSerialization.jsonObject(with: sent.payload) as! NSDictionary
+        let jsonObject2 = try JSONSerialization.jsonObject(with: expectedJSONString.data(using: .utf8)!) as! NSDictionary
+        XCTAssertEqual(jsonObject1, jsonObject2)
+    }
+
     // MARK: - Location Notifications
 
     func testSendLocationNotification() async throws {

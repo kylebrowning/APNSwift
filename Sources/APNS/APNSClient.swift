@@ -242,15 +242,16 @@ extension APNSClient {
             return APNSBroadcastSendResponse(apnsRequestID: apnsRequestID, apnsUniqueID: apnsUniqueID)
         }
 
-        let body = try await response.body.collect(upTo: 1024)
-        let errorResponse = try responseDecoder.decode(APNSErrorResponse.self, from: body)
+        // Same leniency as `send`: an undecodable error body must still surface as a typed `APNSError`.
+        let body = try? await response.body.collect(upTo: 1024)
+        let errorResponse = body.flatMap { try? responseDecoder.decode(APNSErrorResponse.self, from: $0) }
 
         let error = APNSError(
             responseStatus: Int(response.status.code),
             apnsID: nil,
             apnsUniqueID: apnsUniqueID,
             apnsResponse: errorResponse,
-            timestamp: errorResponse.timestampInSeconds.flatMap { Date(timeIntervalSince1970: $0) }
+            timestamp: errorResponse?.timestampInSeconds.flatMap { Date(timeIntervalSince1970: $0) }
         )
 
         throw error
