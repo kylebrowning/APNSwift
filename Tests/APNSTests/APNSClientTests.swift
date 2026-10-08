@@ -15,12 +15,39 @@
 @testable import APNSCore
 import APNS
 import Crypto
+import NIOSSL
 import XCTest
 
 final class APNSClientTests: XCTestCase {
     func testShutdown() async throws {
         let client = self.makeClient()
         try await client.shutdown()
+    }
+
+    func testTLSAuthentication_constructsAndShutsDown() async throws {
+        let privateKey = try NIOSSLPrivateKey(bytes: Array(self.jwtPrivateKey.utf8), format: .pem)
+        let client = APNSClient(
+            configuration: .init(
+                authenticationMethod: .tls(privateKey: .privateKey(privateKey), certificateChain: []),
+                environment: .development
+            ),
+            eventLoopGroupProvider: .createNew,
+            responseDecoder: JSONDecoder(),
+            requestEncoder: JSONEncoder()
+        )
+        try await client.shutdown()
+    }
+
+    func testResponseDescription() {
+        let apnsID = UUID(uuidString: "ABCDEF12-3456-7890-ABCD-EF1234567890")!
+        XCTAssertEqual(
+            APNSResponse(apnsID: apnsID).description,
+            "APNSResponse(apns-id: abcdef12-3456-7890-abcd-ef1234567890, apns-unique-id: nil)"
+        )
+        XCTAssertEqual(
+            APNSResponse().description,
+            "APNSResponse(apns-id: nil, apns-unique-id: nil)"
+        )
     }
 
     // MARK: - Helper methods

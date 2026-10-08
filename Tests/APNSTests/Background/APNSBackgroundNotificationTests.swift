@@ -38,6 +38,25 @@ final class APNSBackgroundNotificationTests: XCTestCase {
         XCTAssertEqual(jsonObject1, jsonObject2)
     }
 
+    func testEncode_emptyPayloadInit() throws {
+        let apnsID = UUID()
+        let notification = APNSBackgroundNotification(
+            expiration: .immediately,
+            topic: "com.example.app",
+            apnsID: apnsID
+        )
+        XCTAssertEqual(notification.apnsID, apnsID)
+        XCTAssertEqual(notification.topic, "com.example.app")
+
+        let data = try JSONEncoder().encode(notification)
+        let expectedJSONString = """
+        {"aps":{"content-available":1}}
+        """
+        let jsonObject1 = try JSONSerialization.jsonObject(with: data) as! NSDictionary
+        let jsonObject2 = try JSONSerialization.jsonObject(with: expectedJSONString.data(using: .utf8)!) as! NSDictionary
+        XCTAssertEqual(jsonObject1, jsonObject2)
+    }
+
     func testEncode_whenAPSKeyInPayload() throws {
         struct Payload: Encodable {
             let aps = "foo"

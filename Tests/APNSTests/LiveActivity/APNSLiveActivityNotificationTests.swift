@@ -12,7 +12,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-import APNSCore
+@testable import APNSCore
 import XCTest
 
 final class APNSLiveActivityNotificationTests: XCTestCase {
@@ -24,6 +24,85 @@ final class APNSLiveActivityNotificationTests: XCTestCase {
     struct State: Encodable, Hashable {
         let string: String = "Test"
         let number: Int = 123
+    }
+
+    func testUpdateSetters_areReflectedInEncodedAPS() throws {
+        var notification = APNSLiveActivityNotification(
+            expiration: .immediately,
+            priority: .immediately,
+            appID: "test.app.id",
+            contentState: State(),
+            event: .update,
+            timestamp: 0
+        )
+
+        notification.timestamp = 1_672_680_658
+        notification.event = .end
+        notification.contentState = State()
+        notification.dismissalDate = .timeIntervalSince1970InSeconds(1_672_690_000)
+        notification.staleDate = 1_672_680_800
+        notification.alert = .init(title: .raw("Hi"))
+        notification.relevanceScore = 0.75
+
+        XCTAssertEqual(notification.timestamp, 1_672_680_658)
+        XCTAssertEqual(notification.event, .end)
+        XCTAssertEqual(notification.contentState, State())
+        XCTAssertEqual(notification.dismissalDate, .timeIntervalSince1970InSeconds(1_672_690_000))
+        XCTAssertEqual(notification.staleDate, 1_672_680_800)
+        XCTAssertEqual(notification.relevanceScore, 0.75)
+        XCTAssertEqual(notification.topic, "test.app.id.push-type.liveactivity")
+
+        let data = try JSONEncoder().encode(notification)
+        let expectedJSONString = """
+            {"aps":{"event":"end","content-state":{"string":"Test","number":123},"timestamp":1672680658,
+            "dismissal-date":1672690000,"stale-date":1672680800,"alert":{"title":"Hi"},"relevance-score":0.75}}
+            """
+        let jsonObject1 = try JSONSerialization.jsonObject(with: data) as! NSDictionary
+        let jsonObject2 = try JSONSerialization.jsonObject(with: expectedJSONString.data(using: .utf8)!) as! NSDictionary
+        XCTAssertEqual(jsonObject1, jsonObject2)
+    }
+
+    func testStartSetters_areReflectedInEncodedAPS() throws {
+        var notification = APNSStartLiveActivityNotification(
+            expiration: .immediately,
+            priority: .immediately,
+            appID: "test.app.id",
+            contentState: State(),
+            timestamp: 0,
+            attributes: Attributes(),
+            attributesType: "Attributes",
+            alert: .init(title: .raw("Hi"))
+        )
+
+        notification.timestamp = 1_672_680_658
+        notification.alert = .init(title: .raw("Changed"), body: .raw("Body"))
+        notification.contentState = State()
+        notification.relevanceScore = 0.25
+
+        XCTAssertEqual(notification.timestamp, 1_672_680_658)
+        XCTAssertEqual(notification.contentState, State())
+        XCTAssertEqual(notification.relevanceScore, 0.25)
+        XCTAssertEqual(notification.topic, "test.app.id.push-type.liveactivity")
+
+        let data = try JSONEncoder().encode(notification)
+        let expectedJSONString = """
+            {"aps":{"event":"start","alert":{"title":"Changed","body":"Body"},"attributes-type":"Attributes",
+            "attributes":{"name":"Test Attribute"},"content-state":{"string":"Test","number":123},
+            "timestamp":1672680658,"relevance-score":0.25}}
+            """
+        let jsonObject1 = try JSONSerialization.jsonObject(with: data) as! NSDictionary
+        let jsonObject2 = try JSONSerialization.jsonObject(with: expectedJSONString.data(using: .utf8)!) as! NSDictionary
+        XCTAssertEqual(jsonObject1, jsonObject2)
+    }
+
+    func testDismissalDate_helpers() {
+        XCTAssertEqual(APNSLiveActivityDismissalDate.none, .init(dismissal: nil))
+        XCTAssertEqual(APNSLiveActivityDismissalDate.immediately, .init(dismissal: 0))
+        XCTAssertEqual(APNSLiveActivityDismissalDate.timeIntervalSince1970InSeconds(1_672_690_000), .init(dismissal: 1_672_690_000))
+        XCTAssertEqual(
+            APNSLiveActivityDismissalDate.date(Date(timeIntervalSince1970: 1_672_690_000.9)),
+            .init(dismissal: 1_672_690_000)
+        )
     }
 
     func testEncodeUpdate() throws {
