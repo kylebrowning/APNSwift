@@ -20,6 +20,70 @@ private struct TestMessage: APNSMessage {}
 /// Direct coverage of ``APNSCore.APNSRequest.headers``, which is the URLSession client's
 /// entire header contract.
 final class APNSRequestTests: XCTestCase {
+    func testSetters_roundTripEveryProperty() throws {
+        var request = APNSRequest(
+            message: TestMessage(),
+            deviceToken: "token",
+            pushType: .alert,
+            expiration: nil,
+            priority: nil,
+            apnsID: nil,
+            topic: nil,
+            collapseID: nil
+        )
+
+        let apnsID = UUID()
+        request.message = TestMessage()
+        request.deviceToken = "other-token"
+        request.pushType = .background
+        request.expiration = .immediately
+        request.priority = .consideringDevicePower
+        request.apnsID = apnsID
+        request.topic = "com.example.app"
+        request.collapseID = "collapse"
+
+        XCTAssertEqual(request.deviceToken, "other-token")
+        XCTAssertEqual(request.pushType, .background)
+        XCTAssertEqual(request.expiration, .immediately)
+        XCTAssertEqual(request.priority, .consideringDevicePower)
+        XCTAssertEqual(request.apnsID, apnsID)
+        XCTAssertEqual(request.topic, "com.example.app")
+        XCTAssertEqual(request.collapseID, "collapse")
+    }
+
+    func testCopyOnWrite_mutatingACopyDoesNotAffectTheOriginal() throws {
+        let original = APNSRequest(
+            message: TestMessage(),
+            deviceToken: "original-token",
+            pushType: .alert,
+            expiration: .immediately,
+            priority: .immediately,
+            apnsID: nil,
+            topic: "com.example.app",
+            collapseID: nil
+        )
+
+        var copy = original
+        copy.deviceToken = "copy-token"
+        copy.pushType = .voip
+        copy.expiration = .none
+        copy.priority = nil
+        copy.apnsID = UUID()
+        copy.topic = "com.example.app.voip"
+        copy.collapseID = "collapse"
+
+        XCTAssertEqual(original.deviceToken, "original-token")
+        XCTAssertEqual(original.pushType, .alert)
+        XCTAssertEqual(original.expiration, .immediately)
+        XCTAssertEqual(original.priority, .immediately)
+        XCTAssertNil(original.apnsID)
+        XCTAssertEqual(original.topic, "com.example.app")
+        XCTAssertNil(original.collapseID)
+        XCTAssertEqual(copy.deviceToken, "copy-token")
+        XCTAssertEqual(copy.headers["apns-push-type"], "voip")
+        XCTAssertNil(copy.headers["apns-expiration"])
+    }
+
     func testHeaders_fullRequestEmitsAllHeaders() throws {
         let apnsID = UUID()
         let request = APNSRequest(
