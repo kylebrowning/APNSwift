@@ -22,7 +22,7 @@ public struct APNSEnvironment: Sendable {
     public static let sandbox = development
     
     /// The development APNs environment.
-    public static let development = Self(url: "https://api.development.push.apple.com", port: 443)
+    public static let development = Self(url: "https://api.sandbox.push.apple.com", port: 443)
 
     /// Creates an APNs environment with a custom URL.
     ///
