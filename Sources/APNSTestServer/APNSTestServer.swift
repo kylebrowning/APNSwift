@@ -162,11 +162,12 @@ public final class APNSTestServer: @unchecked Sendable {
         "location": ".location-query",
         "widgets": ".push-type.widgets",
         "controls": ".push-type.controls",
+        "accessory": ".push-type.accessory",
     ]
 
     private static let validPushTypes: Set<String> = [
         "alert", "background", "location", "voip", "complication",
-        "fileprovider", "mdm", "liveactivity", "pushtotalk", "widgets", "controls",
+        "fileprovider", "mdm", "liveactivity", "pushtotalk", "widgets", "controls", "accessory",
     ]
 
     public init() {
