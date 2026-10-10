@@ -1,4 +1,4 @@
-// swift-tools-version:6.0
+// swift-tools-version:6.1
 import PackageDescription
 
 let package = Package(
@@ -16,6 +16,13 @@ let package = Package(
         .library(name: "APNSURLSession", targets: ["APNSURLSession"]),
         .library(name: "APNSTestServer", targets: ["APNSTestServer"]),
     ],
+    traits: [
+        .trait(
+            name: "ServiceLifecycleSupport",
+            description: "Conforms the APNs clients to swift-service-lifecycle's Service protocol."
+        ),
+        .default(enabledTraits: ["ServiceLifecycleSupport"]),
+    ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-log.git", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-crypto.git", "3.0.0" ..< "5.0.0"),
@@ -23,6 +30,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.42.0"),
         .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.6.0"),
+        .package(url: "https://github.com/swift-server/swift-service-lifecycle.git", from: "2.6.0"),
     ],
     targets: [
         .executableTarget(
@@ -41,7 +49,13 @@ let package = Package(
                 .target(name: "APNSURLSession"),
                 .target(name: "APNSTestServer"),
                 .product(name: "Crypto", package: "swift-crypto"),
+                .product(name: "Logging", package: "swift-log"),
                 .product(name: "NIOPosix", package: "swift-nio"),
+                .product(
+                    name: "ServiceLifecycle",
+                    package: "swift-service-lifecycle",
+                    condition: .when(traits: ["ServiceLifecycleSupport"])
+                ),
             ]
         ),
         .target(
@@ -56,10 +70,16 @@ let package = Package(
                 .target(name: "APNSCore"),
                 .product(name: "AsyncHTTPClient", package: "async-http-client"),
                 .product(name: "Crypto", package: "swift-crypto"),
+                .product(name: "NIOConcurrencyHelpers", package: "swift-nio"),
                 .product(name: "NIOHTTP1", package: "swift-nio"),
                 .product(name: "NIOPosix", package: "swift-nio"),
                 .product(name: "NIOTLS", package: "swift-nio"),
                 .product(name: "NIOSSL", package: "swift-nio-ssl"),
+                .product(
+                    name: "ServiceLifecycle",
+                    package: "swift-service-lifecycle",
+                    condition: .when(traits: ["ServiceLifecycleSupport"])
+                ),
             ]
         ),
         .target(
