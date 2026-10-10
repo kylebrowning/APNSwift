@@ -21,12 +21,13 @@ import struct FoundationEssentials.UUID
 import struct Foundation.Date
 import struct Foundation.UUID
 #endif
+import NIOConcurrencyHelpers
 import NIOCore
 import NIOHTTP1
 import NIOSSL
 
 /// A client to talk with the Apple Push Notification services.
-public final class APNSClient<Decoder: APNSJSONDecoder, Encoder: APNSJSONEncoder>: APNSClientProtocol {
+public final class APNSClient<Decoder: APNSJSONDecoder & Sendable, Encoder: APNSJSONEncoder & Sendable>: APNSClientProtocol {
    
     /// The configuration used by the ``APNSClient``.
     private let configuration: APNSClientConfiguration
@@ -48,6 +49,9 @@ public final class APNSClient<Decoder: APNSJSONDecoder, Encoder: APNSJSONEncoder
     @usableFromInline
     /* private */ internal let byteBufferAllocator: ByteBufferAllocator
     
+    /// Whether `run()` has been called. It may only run once.
+    /* private */ internal let isRunning = NIOLockedValueBox(false)
+
     /// Default ``HTTPHeaders`` which will be adapted for each request. This saves some allocations.
     private let defaultRequestHeaders: HTTPHeaders = {
         var headers = HTTPHeaders()
@@ -121,7 +125,6 @@ public final class APNSClient<Decoder: APNSJSONDecoder, Encoder: APNSJSONEncoder
     }
 }
 
-extension APNSClient: Sendable where Decoder: Sendable, Encoder: Sendable {}
 
 // MARK: - Raw sending
 

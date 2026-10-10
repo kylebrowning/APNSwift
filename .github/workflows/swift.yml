@@ -15,6 +15,13 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - run: swift test
+  no-service-lifecycle:
+    container:
+      image: swift:6.2-bookworm
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - run: swift build --disable-default-traits
   thread:
     container:
       image: swift:6.2-bookworm
