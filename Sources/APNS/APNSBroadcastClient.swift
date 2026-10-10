@@ -53,7 +53,7 @@ public final class APNSBroadcastClient<Decoder: APNSJSONDecoder & Sendable, Enco
     /* private */ internal let byteBufferAllocator: ByteBufferAllocator
 
     /// Whether `run()` has been called. It may only run once.
-    /* private */ internal let isRunning = NIOLockedValueBox(false)
+    let isRunning = NIOLockedValueBox(false)
 
     /// Default ``HTTPHeaders`` which will be adapted for each request. This saves some allocations.
     private let defaultRequestHeaders: HTTPHeaders = {
