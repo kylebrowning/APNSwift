@@ -311,7 +311,7 @@ struct APNSClientIntegrationTests {
             let notification = APNSWidgetsNotification(appID: "com.example.app")
 
             _ = try await client.sendWidgetsNotification(
-                notification: notification,
+                notification,
                 deviceToken: "aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111"
             )
 

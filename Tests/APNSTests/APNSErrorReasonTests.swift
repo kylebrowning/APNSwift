@@ -51,7 +51,6 @@ struct APNSErrorReasonTests {
         (.internalServerError, "InternalServerError"),
         (.serviceUnavailable, "ServiceUnavailable"),
         (.shutdown, "Shutdown"),
-        (.badEnvironmentKeyInToken, "BadEnvironmentKeyInToken"),
         (.featureNotEnabled, "FeatureNotEnabled"),
         (.missingChannelId, "MissingChannelId"),
         (.badChannelId, "BadChannelId"),
@@ -84,11 +83,7 @@ struct APNSErrorReasonTests {
     /// guard against the two being conflated.
     @Test func `Similar environment reasons are distinct`() {
         #expect(
-            APNSError.ErrorReason.Reason.badEnvironmentKeyInToken
-                != APNSError.ErrorReason.Reason.badEnvironmentKeyIdInToken
-        )
-        #expect(
-            APNSError.ErrorReason.Reason(rawValue: "BadEnvironmentKeyInToken") == .badEnvironmentKeyInToken
+            APNSError.ErrorReason.Reason(rawValue: "BadEnvironmentKeyInToken") == .unknown("BadEnvironmentKeyInToken")
         )
         #expect(
             APNSError.ErrorReason.Reason(rawValue: "BadEnvironmentKeyIdInToken") == .badEnvironmentKeyIdInToken

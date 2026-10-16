@@ -62,7 +62,6 @@ public struct APNSError: Error {
             case internalServerError
             case serviceUnavailable
             case shutdown
-            case badEnvironmentKeyInToken
             case featureNotEnabled
             case missingChannelId
             case badChannelId
@@ -140,8 +139,6 @@ public struct APNSError: Error {
                     self = .serviceUnavailable
                 case "Shutdown":
                     self = .shutdown
-                case "BadEnvironmentKeyInToken":
-                    self = .badEnvironmentKeyInToken
                 case "FeatureNotEnabled":
                     self = .featureNotEnabled
                 case "MissingChannelId":
@@ -231,8 +228,6 @@ public struct APNSError: Error {
                     return "ServiceUnavailable"
                 case .shutdown:
                     return "Shutdown"
-                case .badEnvironmentKeyInToken:
-                    return "BadEnvironmentKeyInToken"
                 case .featureNotEnabled:
                     return "FeatureNotEnabled"
                 case .missingChannelId:
@@ -322,8 +317,6 @@ public struct APNSError: Error {
                     return "The service is unavailable"
                 case .shutdown:
                     return "The server is shutting down"
-                case .badEnvironmentKeyInToken:
-                    return "Environment mismatch between key and APNs endpoint"
                 case .featureNotEnabled:
                     return "The broadcast push feature isn't enabled for this topic"
                 case .missingChannelId:
@@ -486,11 +479,6 @@ public struct APNSError: Error {
 
         public static var shutdown: Self {
             return .init(_reason: .shutdown)
-        }
-
-        @available(*, deprecated, message: "Not a documented APNs error reason; see badEnvironmentKeyIdInToken.")
-        public static var badEnvironmentKeyInToken: Self {
-            return .init(_reason: .badEnvironmentKeyInToken)
         }
 
         public static var featureNotEnabled: Self {
