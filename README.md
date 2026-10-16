@@ -52,12 +52,9 @@ try await client.shutdown()
 
 With the `ServiceLifecycleSupport` trait, which is enabled by default, `APNSClient`, `APNSBroadcastClient` and `APNSClients` conform to [swift-service-lifecycle](https://github.com/swift-server/swift-service-lifecycle)'s `Service`. Add a client to your `ServiceGroup` and it is shut down when the group shuts down, so you never call `shutdown()` yourself. This is how you use APNSwift from Hummingbird, Vapor 5, or any other `ServiceGroup` based app.
 
-For example, in Hummingbird, register the client with the application and use it from your routes:
+Create the client once at startup:
 
 ```swift
-import APNS
-import Hummingbird
-
 let client = APNSClient(
     configuration: .init(
         authenticationMethod: .jwt(
@@ -72,19 +69,25 @@ let client = APNSClient(
     requestEncoder: JSONEncoder()
 )
 
+let notification = APNSAlertNotification(
+    alert: .init(title: .raw("Hello")),
+    expiration: .immediately,
+    priority: .immediately,
+    topic: "com.example.app",
+    payload: EmptyPayload()
+)
+```
+
+### Hummingbird
+
+```swift
+import APNS
+import Hummingbird
+
 let router = Router()
 router.post("devices/:token/notify") { request, context in
     let token = try context.parameters.require("token")
-    try await client.sendAlertNotification(
-        APNSAlertNotification(
-            alert: .init(title: .raw("Hello")),
-            expiration: .immediately,
-            priority: .immediately,
-            topic: "com.example.app",
-            payload: EmptyPayload()
-        ),
-        deviceToken: token
-    )
+    try await client.sendAlertNotification(notification, deviceToken: token)
     return HTTPResponse.Status.accepted
 }
 
@@ -93,7 +96,26 @@ app.addServices(client)
 try await app.runService()
 ```
 
-Anywhere else, add the client to your own `ServiceGroup`:
+### Vapor 5
+
+```swift
+import APNS
+import Vapor
+
+let app = try Application()
+app.post("devices", ":token", "notify") { req in
+    let token = try req.parameters.require("token")
+    try await client.sendAlertNotification(notification, deviceToken: token)
+    return HTTPResponse.Status.accepted
+}
+
+app.addService(client)
+try await app.start()
+```
+
+### Other apps
+
+Add the client to your own `ServiceGroup`:
 
 ```swift
 let serviceGroup = ServiceGroup(
@@ -103,6 +125,8 @@ let serviceGroup = ServiceGroup(
 )
 try await serviceGroup.run()
 ```
+
+### Without the trait
 
 If you don't want the dependency, disable the trait and shut clients down yourself:
 
