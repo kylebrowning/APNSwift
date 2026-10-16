@@ -12,9 +12,9 @@
 //
 //===----------------------------------------------------------------------===//
 import APNSCore
-import NIOConcurrencyHelpers
 import NIOCore
 import NIOPosix
+import Synchronization
 
 #if canImport(FoundationEssentials)
     import class FoundationEssentials.JSONDecoder
@@ -78,7 +78,7 @@ public final class APNSClients: Sendable {
         var defaultID: ID?
     }
 
-    private let state = NIOLockedValueBox(State())
+    private let state = Mutex(State())
 
     public init() {}
 
@@ -113,7 +113,7 @@ public final class APNSClients: Sendable {
             byteBufferAllocator: byteBufferAllocator
         )
 
-        self.state.withLockedValue { state in
+        self.state.withLock { state in
             state.clients[id] = client
             if isDefault == true || (state.defaultID == nil && isDefault != false) {
                 state.defaultID = id
@@ -147,12 +147,12 @@ public final class APNSClients: Sendable {
 
     /// Makes the client registered under `id` the one client returns.
     public func `default`(to id: ID) {
-        self.state.withLockedValue { $0.defaultID = id }
+        self.state.withLock { $0.defaultID = id }
     }
 
     /// The client registered under `id`, or the default client when `id` is `nil`.
     public func client(for id: ID? = nil) -> Client? {
-        self.state.withLockedValue { state in
+        self.state.withLock { state in
             guard let id = id ?? state.defaultID else { return nil }
             return state.clients[id]
         }
@@ -182,7 +182,7 @@ public final class APNSClients: Sendable {
     ///
     /// Every client is shut down even if one fails. The first failure is rethrown afterwards.
     public func shutdown() async throws {
-        let clients = self.state.withLockedValue { state in
+        let clients = self.state.withLock { state in
             defer { state = State() }
             return state.clients.values
         }
