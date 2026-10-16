@@ -8,7 +8,7 @@ To install `APNSwift`, just add the package as a dependency in your [**Package.s
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/kylebrowning/APNSwift.git", from: "7.0.0"),
+    .package(url: "https://github.com/kylebrowning/APNSwift.git", from: "8.0.0"),
 ]
 ```
 
@@ -117,7 +117,7 @@ try await serviceGroup.run()
 If you don't want the dependency, disable the trait and shut clients down yourself:
 
 ```swift
-.package(url: "https://github.com/kylebrowning/APNSwift.git", from: "7.1.0", traits: []),
+.package(url: "https://github.com/kylebrowning/APNSwift.git", from: "8.0.0", traits: []),
 ```
 
 ## Production and development clients
