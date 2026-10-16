@@ -311,7 +311,7 @@ struct APNSClientIntegrationTests {
             let notification = APNSWidgetsNotification(appID: "com.example.app")
 
             _ = try await client.sendWidgetsNotification(
-                notification: notification,
+                notification,
                 deviceToken: "aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111"
             )
 
@@ -376,6 +376,38 @@ struct APNSClientIntegrationTests {
 
             let expectedJSONString = """
             {"mdm":"PushMagicValue"}
+            """
+            let jsonObject1 = try #require(JSONSerialization.jsonObject(with: sent.payload) as? NSDictionary)
+            let jsonObject2 = try #require(
+                JSONSerialization.jsonObject(with: Data(expectedJSONString.utf8)) as? NSDictionary
+            )
+            #expect(jsonObject1 == jsonObject2)
+        }
+    }
+
+    // MARK: - Accessory Notifications
+
+    @Test func `Send accessory notification`() async throws {
+        try await TestFixtures.withClient { server, client in
+            let notification = APNSAccessoryNotification(
+                appID: "com.example.app",
+                encryptedData: "ZW5jcnlwdGVk",
+                sessionIdentifier: "session-1",
+                keyID: "a2V5",
+                messageIndex: 42
+            )
+
+            _ = try await client.sendAccessoryNotification(
+                notification,
+                deviceToken: "aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111aaaa1111"
+            )
+
+            let sent = try #require(server.getSentNotifications().first)
+            #expect(sent.pushType == "accessory")
+            #expect(sent.topic == "com.example.app.push-type.accessory")
+
+            let expectedJSONString = """
+            {"aps":{"encryptedData":"ZW5jcnlwdGVk","sessionIdentifier":"session-1","keyID":"a2V5","messageIndex":"42"}}
             """
             let jsonObject1 = try #require(JSONSerialization.jsonObject(with: sent.payload) as? NSDictionary)
             let jsonObject2 = try #require(

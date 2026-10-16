@@ -8,7 +8,7 @@ To install `APNSwift`, just add the package as a dependency in your [**Package.s
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/kylebrowning/APNSwift.git", from: "7.0.0"),
+    .package(url: "https://github.com/kylebrowning/APNSwift.git", from: "8.0.0"),
 ]
 ```
 
@@ -25,7 +25,6 @@ let client = APNSClient(
         ),
         environment: .development
     ),
-    eventLoopGroupProvider: .createNew,
     responseDecoder: JSONDecoder(),
     requestEncoder: JSONEncoder()
 )
@@ -33,6 +32,110 @@ let client = APNSClient(
 // Shutdown the client when done
 try await client.shutdown()
 ```
+
+## Running as a service
+
+With the `ServiceLifecycleSupport` trait, which is enabled by default, `APNSClient`, `APNSBroadcastClient` and `APNSClients` conform to [swift-service-lifecycle](https://github.com/swift-server/swift-service-lifecycle)'s `Service`. Add a client to your `ServiceGroup` and it is shut down when the group shuts down, so you never call `shutdown()` yourself. This is how you use APNSwift from Hummingbird, Vapor 5, or any other `ServiceGroup` based app.
+
+Create the client once at startup:
+
+```swift
+let client = APNSClient(
+    configuration: .init(
+        authenticationMethod: .jwt(
+            privateKey: try .init(pemRepresentation: privateKey),
+            keyIdentifier: keyIdentifier,
+            teamIdentifier: teamIdentifier
+        ),
+        environment: .production
+    ),
+    eventLoopGroupProvider: .shared(MultiThreadedEventLoopGroup.singleton),
+    responseDecoder: JSONDecoder(),
+    requestEncoder: JSONEncoder()
+)
+
+let notification = APNSAlertNotification(
+    alert: .init(title: .raw("Hello")),
+    expiration: .immediately,
+    priority: .immediately,
+    topic: "com.example.app",
+    payload: EmptyPayload()
+)
+```
+
+### Hummingbird
+
+```swift
+import APNS
+import Hummingbird
+
+let router = Router()
+router.post("devices/:token/notify") { request, context in
+    let token = try context.parameters.require("token")
+    try await client.sendAlertNotification(notification, deviceToken: token)
+    return HTTPResponse.Status.accepted
+}
+
+var app = Application(router: router)
+app.addServices(client)
+try await app.runService()
+```
+
+### Vapor 5
+
+```swift
+import APNS
+import Vapor
+
+let app = try Application()
+app.post("devices", ":token", "notify") { req in
+    let token = try req.parameters.require("token")
+    try await client.sendAlertNotification(notification, deviceToken: token)
+    return HTTPResponse.Status.accepted
+}
+
+app.addService(client)
+try await app.start()
+```
+
+### Other apps
+
+Add the client to your own `ServiceGroup`:
+
+```swift
+let serviceGroup = ServiceGroup(
+    services: [server, client],
+    gracefulShutdownSignals: [.sigterm],
+    logger: logger
+)
+try await serviceGroup.run()
+```
+
+### Without the trait
+
+If you don't want the dependency, disable the trait and shut clients down yourself:
+
+```swift
+.package(url: "https://github.com/kylebrowning/APNSwift.git", from: "8.0.0", traits: []),
+```
+
+## Production and development clients
+
+A device token only works against the environment the app was built for, so most servers need a production client and a development client. `APNSClients` holds a set of clients looked up by ID and registers both from one key:
+
+```swift
+let apns = APNSClients()
+apns.configure(.jwt(
+    privateKey: try .init(pemRepresentation: privateKey),
+    keyIdentifier: keyIdentifier,
+    teamIdentifier: teamIdentifier
+))
+
+try await apns.client(.development).sendAlertNotification(notification, deviceToken: token)
+try await apns.client(.production).sendAlertNotification(notification, deviceToken: token)
+```
+
+`APNSClients` is also a `Service`, so add it to your group instead of the individual clients. For custom setups, `use(_:as:)` registers a client under any ID and `default(to:)` picks which one `client` returns.
 
 ## Sending a simple notification
 All notifications require a payload, but that payload can be empty. Payload just needs to conform to `Encodable`

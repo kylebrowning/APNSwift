@@ -381,6 +381,7 @@ struct APNSTestServerValidationTests {
         ("pushtotalk", "com.example.app.voip-ptt"),
         ("widgets", "com.example.app.push-type.widgets"),
         ("controls", "com.example.app.push-type.controls"),
+        ("accessory", "com.example.app.push-type.accessory"),
     ])
     func `Valid push type is accepted`(pushType: String, topic: String) async throws {
         try await TestFixtures.withRawHTTPClient { server, httpClient in

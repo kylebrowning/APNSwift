@@ -23,18 +23,9 @@ struct APNSEnvironmentTests {
     }
 
     @Test func development() {
-        #expect(APNSEnvironment.development.url == "https://api.development.push.apple.com")
+        #expect(APNSEnvironment.development.url == "https://api.sandbox.push.apple.com")
         #expect(APNSEnvironment.development.port == 443)
-        #expect(APNSEnvironment.development.absoluteURL == "https://api.development.push.apple.com:443/3/device")
-    }
-
-    @available(*, deprecated, message: "Intentionally exercising the deprecated `.sandbox` alias.")
-    @Test func `Sandbox is alias for development`() {
-        // `.sandbox` is deprecated in favor of `.development`, but must remain behaviorally identical.
-        let sandbox = APNSEnvironment.sandbox
-        #expect(sandbox.url == APNSEnvironment.development.url)
-        #expect(sandbox.port == APNSEnvironment.development.port)
-        #expect(sandbox.absoluteURL == APNSEnvironment.development.absoluteURL)
+        #expect(APNSEnvironment.development.absoluteURL == "https://api.sandbox.push.apple.com:443/3/device")
     }
 
     @Test func `Custom composes URL and port`() {
