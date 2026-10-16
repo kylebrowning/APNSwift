@@ -40,22 +40,4 @@ extension APNSClientProtocol {
         )
         return try await send(request)
     }
-
-    /// Sends a widgets update notification to APNs.
-    ///
-    /// - Parameters:
-    ///   - notification: The notification to send.
-    ///
-    ///   - deviceToken: The hexadecimal bytes that identify the user’s device. Your app receives the bytes for this device token
-    ///    when registering for remote notifications.
-    ///
-    @discardableResult
-    @inlinable
-    @available(*, deprecated, renamed: "sendWidgetsNotification(_:deviceToken:)")
-    public func sendWidgetsNotification(
-        notification: APNSWidgetsNotification,
-        deviceToken: String
-    ) async throws -> APNSResponse {
-        try await self.sendWidgetsNotification(notification, deviceToken: deviceToken)
-    }
 }

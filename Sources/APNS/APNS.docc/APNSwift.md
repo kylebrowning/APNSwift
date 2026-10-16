@@ -25,7 +25,6 @@ let client = APNSClient(
         ),
         environment: .development
     ),
-    eventLoopGroupProvider: .createNew,
     responseDecoder: JSONDecoder(),
     requestEncoder: JSONEncoder()
 )

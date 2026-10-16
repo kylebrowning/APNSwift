@@ -23,6 +23,7 @@ import struct Foundation.UUID
 #endif
 import NIOCore
 import NIOHTTP1
+import NIOPosix
 import NIOSSL
 
 /// A client for managing Apple Push Notification broadcast channels.
@@ -77,7 +78,7 @@ public final class APNSBroadcastClient<Decoder: APNSJSONDecoder & Sendable, Enco
         authenticationMethod: APNSClientConfiguration.AuthenticationMethod,
         environment: APNSBroadcastEnvironment,
         bundleID: String,
-        eventLoopGroupProvider: NIOEventLoopGroupProvider,
+        eventLoopGroupProvider: NIOEventLoopGroupProvider = .shared(MultiThreadedEventLoopGroup.singleton),
         responseDecoder: Decoder,
         requestEncoder: Encoder,
         byteBufferAllocator: ByteBufferAllocator = .init(),
