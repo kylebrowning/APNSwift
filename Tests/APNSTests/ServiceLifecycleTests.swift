@@ -52,7 +52,7 @@
 
         @Test func `APNSClients shuts down with its service group`() async throws {
             let apns = APNSClients()
-            await apns.configure(try TestFixtures.jwtAuthentication())
+            apns.configure(try TestFixtures.jwtAuthentication())
             let group = ServiceGroup(
                 services: [apns],
                 gracefulShutdownSignals: [],
@@ -67,8 +67,8 @@
                 try await tasks.waitForAll()
             }
 
-            #expect(await apns.client(for: .production) == nil)
-            #expect(await apns.client(for: .development) == nil)
+            #expect(apns.client(for: .production) == nil)
+            #expect(apns.client(for: .development) == nil)
         }
 
         @Test func `APNSClient shuts down with its service group`() async throws {

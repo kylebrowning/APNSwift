@@ -19,42 +19,42 @@ import Testing
 struct APNSClientsTests {
     @Test func `configure registers production and development`() async throws {
         let apns = APNSClients()
-        await apns.configure(try TestFixtures.jwtAuthentication())
+        apns.configure(try TestFixtures.jwtAuthentication())
 
-        let production = await apns.client(for: .production)
-        let development = await apns.client(for: .development)
+        let production = apns.client(for: .production)
+        let development = apns.client(for: .development)
         #expect(production != nil)
         #expect(development != nil)
         #expect(production !== development)
-        #expect(await apns.client === production)
+        #expect(apns.client === production)
 
         try await apns.shutdown()
     }
 
     @Test func `First registration is the default unless told otherwise`() async throws {
         let apns = APNSClients()
-        #expect(await apns.client(for: nil) == nil)
-        #expect(await apns.client(for: .default) == nil)
+        #expect(apns.client(for: nil) == nil)
+        #expect(apns.client(for: .default) == nil)
 
-        await apns.use(try Self.configuration(), as: .default)
-        await apns.use(try Self.configuration(), as: .custom)
-        #expect(await apns.client === apns.client(.default))
+        apns.use(try Self.configuration(), as: .default)
+        apns.use(try Self.configuration(), as: .custom)
+        #expect(apns.client === apns.client(.default))
 
-        await apns.use(try Self.configuration(), as: .development, isDefault: true)
-        #expect(await apns.client === apns.client(.development))
+        apns.use(try Self.configuration(), as: .development, isDefault: true)
+        #expect(apns.client === apns.client(.development))
 
-        await apns.default(to: .custom)
-        #expect(await apns.client === apns.client(.custom))
+        apns.default(to: .custom)
+        #expect(apns.client === apns.client(.custom))
 
         try await apns.shutdown()
     }
 
     @Test func `Registering under an existing ID replaces the client`() async throws {
         let apns = APNSClients()
-        await apns.use(try Self.configuration(), as: .default)
-        let first = try #require(await apns.client(for: .default))
-        await apns.use(try Self.configuration(), as: .default)
-        let second = try #require(await apns.client(for: .default))
+        apns.use(try Self.configuration(), as: .default)
+        let first = try #require(apns.client(for: .default))
+        apns.use(try Self.configuration(), as: .default)
+        let second = try #require(apns.client(for: .default))
         #expect(first !== second)
 
         try await first.shutdown()
@@ -63,10 +63,10 @@ struct APNSClientsTests {
 
     @Test func `Shutdown empties the set`() async throws {
         let apns = APNSClients()
-        await apns.configure(try TestFixtures.jwtAuthentication())
+        apns.configure(try TestFixtures.jwtAuthentication())
         try await apns.shutdown()
-        #expect(await apns.client(for: nil) == nil)
-        #expect(await apns.client(for: .production) == nil)
+        #expect(apns.client(for: nil) == nil)
+        #expect(apns.client(for: .production) == nil)
 
         // Shutting down an empty set is harmless.
         try await apns.shutdown()
@@ -75,7 +75,7 @@ struct APNSClientsTests {
     @Test func `Sends through a registered client`() async throws {
         try await TestFixtures.withServer { server in
             let apns = APNSClients()
-            await apns.use(
+            apns.use(
                 .init(
                     authenticationMethod: try TestFixtures.jwtAuthentication(),
                     environment: .custom(url: "http://127.0.0.1", port: server.port)

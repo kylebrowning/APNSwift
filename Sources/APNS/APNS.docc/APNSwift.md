@@ -38,9 +38,52 @@ try await client.shutdown()
 
 With the `ServiceLifecycleSupport` trait, which is enabled by default, `APNSClient`, `APNSBroadcastClient` and `APNSClients` conform to [swift-service-lifecycle](https://github.com/swift-server/swift-service-lifecycle)'s `Service`. Add a client to your `ServiceGroup` and it is shut down when the group shuts down, so you never call `shutdown()` yourself. This is how you use APNSwift from Hummingbird, Vapor 5, or any other `ServiceGroup` based app.
 
+For example, in Hummingbird, register the client with the application and use it from your routes:
+
+```swift
+import APNS
+import Hummingbird
+
+let client = APNSClient(
+    configuration: .init(
+        authenticationMethod: .jwt(
+            privateKey: try .init(pemRepresentation: privateKey),
+            keyIdentifier: keyIdentifier,
+            teamIdentifier: teamIdentifier
+        ),
+        environment: .production
+    ),
+    eventLoopGroupProvider: .shared(MultiThreadedEventLoopGroup.singleton),
+    responseDecoder: JSONDecoder(),
+    requestEncoder: JSONEncoder()
+)
+
+let router = Router()
+router.post("devices/:token/notify") { request, context in
+    let token = try context.parameters.require("token")
+    try await client.sendAlertNotification(
+        APNSAlertNotification(
+            alert: .init(title: .raw("Hello")),
+            expiration: .immediately,
+            priority: .immediately,
+            topic: "com.example.app",
+            payload: EmptyPayload()
+        ),
+        deviceToken: token
+    )
+    return HTTPResponse.Status.accepted
+}
+
+var app = Application(router: router)
+app.addServices(client)
+try await app.runService()
+```
+
+Anywhere else, add the client to your own `ServiceGroup`:
+
 ```swift
 let serviceGroup = ServiceGroup(
-    services: [app, client],
+    services: [server, client],
     gracefulShutdownSignals: [.sigterm],
     logger: logger
 )
@@ -59,7 +102,7 @@ A device token only works against the environment the app was built for, so most
 
 ```swift
 let apns = APNSClients()
-await apns.configure(.jwt(
+apns.configure(.jwt(
     privateKey: try .init(pemRepresentation: privateKey),
     keyIdentifier: keyIdentifier,
     teamIdentifier: teamIdentifier

@@ -35,7 +35,7 @@ import NIOPosix
 ///
 /// ```swift
 /// let apns = APNSClients()
-/// await apns.configure(.jwt(
+/// apns.configure(.jwt(
 ///     privateKey: try .init(pemRepresentation: privateKey),
 ///     keyIdentifier: keyIdentifier,
 ///     teamIdentifier: teamIdentifier
@@ -49,7 +49,7 @@ import NIOPosix
 /// shuts down. Add either the set or its clients to the group, not both.
 ///
 /// Without the trait, call ``shutdown()`` yourself.
-public final actor APNSClients {
+public final class APNSClients: Sendable {
     /// The default JSON coders are used for every client in the set.
     public typealias Client = APNSClient<JSONDecoder, JSONEncoder>
 
@@ -73,9 +73,12 @@ public final actor APNSClients {
         public static var `default`: ID { ID(string: "default") }
     }
 
-    private var clients: [ID: Client] = [:]
-    private var defaultID: ID?
-    private let isRunning = NIOLockedValueBox(false)
+    private struct State {
+        var clients: [ID: Client] = [:]
+        var defaultID: ID?
+    }
+
+    private let state = NIOLockedValueBox(State())
 
     public init() {}
 
@@ -102,7 +105,7 @@ public final actor APNSClients {
         as id: ID,
         isDefault: Bool? = nil
     ) {
-        self.clients[id] = Client(
+        let client = Client(
             configuration: configuration,
             eventLoopGroupProvider: eventLoopGroupProvider,
             responseDecoder: responseDecoder,
@@ -110,8 +113,11 @@ public final actor APNSClients {
             byteBufferAllocator: byteBufferAllocator
         )
 
-        if isDefault == true || (self.defaultID == nil && isDefault != false) {
-            self.defaultID = id
+        self.state.withLockedValue { state in
+            state.clients[id] = client
+            if isDefault == true || (state.defaultID == nil && isDefault != false) {
+                state.defaultID = id
+            }
         }
     }
 
@@ -141,13 +147,15 @@ public final actor APNSClients {
 
     /// Makes the client registered under `id` the one client returns.
     public func `default`(to id: ID) {
-        self.defaultID = id
+        self.state.withLockedValue { $0.defaultID = id }
     }
 
     /// The client registered under `id`, or the default client when `id` is `nil`.
     public func client(for id: ID? = nil) -> Client? {
-        guard let id = id ?? self.defaultID else { return nil }
-        return self.clients[id]
+        self.state.withLockedValue { state in
+            guard let id = id ?? state.defaultID else { return nil }
+            return state.clients[id]
+        }
     }
 
     /// The default client.
@@ -174,9 +182,10 @@ public final actor APNSClients {
     ///
     /// Every client is shut down even if one fails. The first failure is rethrown afterwards.
     public func shutdown() async throws {
-        let clients = self.clients.values
-        self.clients.removeAll()
-        self.defaultID = nil
+        let clients = self.state.withLockedValue { state in
+            defer { state = State() }
+            return state.clients.values
+        }
 
         var firstError: (any Error)?
         for client in clients {
@@ -197,10 +206,7 @@ public final actor APNSClients {
         /// Keeps the clients alive until graceful shutdown is triggered, then shuts them all down.
         ///
         /// Cancelling the task running `run()` also shuts the clients down.
-        ///
-        /// - Precondition: `run()` is called at most once.
         public func run() async throws {
-            self.isRunning.markRunning(client: "APNSClients")
             try? await gracefulShutdown()
             try await self.shutdown()
         }

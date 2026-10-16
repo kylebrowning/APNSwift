@@ -21,7 +21,6 @@ import struct FoundationEssentials.UUID
 import struct Foundation.Date
 import struct Foundation.UUID
 #endif
-import NIOConcurrencyHelpers
 import NIOCore
 import NIOHTTP1
 import NIOSSL
@@ -51,9 +50,6 @@ public final class APNSBroadcastClient<Decoder: APNSJSONDecoder & Sendable, Enco
     /// The ByteBufferAllocator
     @usableFromInline
     /* private */ internal let byteBufferAllocator: ByteBufferAllocator
-
-    /// Whether `run()` has been called. It may only run once.
-    let isRunning = NIOLockedValueBox(false)
 
     /// Default ``HTTPHeaders`` which will be adapted for each request. This saves some allocations.
     private let defaultRequestHeaders: HTTPHeaders = {
