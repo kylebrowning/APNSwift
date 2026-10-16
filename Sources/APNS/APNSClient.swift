@@ -23,6 +23,7 @@ import struct Foundation.UUID
 #endif
 import NIOCore
 import NIOHTTP1
+import NIOPosix
 import NIOSSL
 
 /// A client to talk with the Apple Push Notification services.
@@ -72,7 +73,7 @@ public final class APNSClient<Decoder: APNSJSONDecoder, Encoder: APNSJSONEncoder
     ///   - byteBufferAllocator: The `ByteBufferAllocator`.
     public init(
         configuration: APNSClientConfiguration,
-        eventLoopGroupProvider: NIOEventLoopGroupProvider,
+        eventLoopGroupProvider: NIOEventLoopGroupProvider = .shared(MultiThreadedEventLoopGroup.singleton),
         responseDecoder: Decoder,
         requestEncoder: Encoder,
         byteBufferAllocator: ByteBufferAllocator = .init()

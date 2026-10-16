@@ -10,7 +10,6 @@ let package = Package(
         .tvOS(.v16),
     ],
     products: [
-        .executable(name: "APNSExample", targets: ["APNSExample"]),
         .library(name: "APNS", targets: ["APNS"]),
         .library(name: "APNSCore", targets: ["APNSCore"]),
         .library(name: "APNSURLSession", targets: ["APNSURLSession"]),

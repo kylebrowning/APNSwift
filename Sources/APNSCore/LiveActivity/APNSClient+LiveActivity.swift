@@ -23,7 +23,7 @@ extension APNSClientProtocol {
     ///
     @discardableResult
     @inlinable
-    public func sendLiveActivityNotification<ContentState: Encodable>(
+    public func sendLiveActivityNotification<ContentState: Encodable & Sendable>(
         _ notification: APNSLiveActivityNotification<ContentState>,
         deviceToken: String
     ) async throws -> APNSResponse {
