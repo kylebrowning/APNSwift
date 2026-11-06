@@ -37,9 +37,13 @@ try await client.shutdown()
 
 With the `ServiceLifecycleSupport` trait, which is enabled by default, `APNSClient`, `APNSBroadcastClient` and `APNSClients` conform to [swift-service-lifecycle](https://github.com/swift-server/swift-service-lifecycle)'s `Service`. Add a client to your `ServiceGroup` and it is shut down when the group shuts down, so you never call `shutdown()` yourself. This is how you use APNSwift from Hummingbird, Vapor 5, or any other `ServiceGroup` based app.
 
-Create the client once at startup:
+### Hummingbird
 
 ```swift
+import APNS
+import Foundation
+import Hummingbird
+
 let client = APNSClient(
     configuration: .init(
         authenticationMethod: .jwt(
@@ -49,7 +53,6 @@ let client = APNSClient(
         ),
         environment: .production
     ),
-    eventLoopGroupProvider: .shared(MultiThreadedEventLoopGroup.singleton),
     responseDecoder: JSONDecoder(),
     requestEncoder: JSONEncoder()
 )
@@ -61,13 +64,6 @@ let notification = APNSAlertNotification(
     topic: "com.example.app",
     payload: EmptyPayload()
 )
-```
-
-### Hummingbird
-
-```swift
-import APNS
-import Hummingbird
 
 let router = Router()
 router.post("devices/:token/notify") { request, context in
@@ -85,7 +81,29 @@ try await app.runService()
 
 ```swift
 import APNS
+import Foundation
 import Vapor
+
+let client = APNSClient(
+    configuration: .init(
+        authenticationMethod: .jwt(
+            privateKey: try .init(pemRepresentation: privateKey),
+            keyIdentifier: keyIdentifier,
+            teamIdentifier: teamIdentifier
+        ),
+        environment: .production
+    ),
+    responseDecoder: JSONDecoder(),
+    requestEncoder: JSONEncoder()
+)
+
+let notification = APNSAlertNotification(
+    alert: .init(title: .raw("Hello")),
+    expiration: .immediately,
+    priority: .immediately,
+    topic: "com.example.app",
+    payload: EmptyPayload()
+)
 
 let app = try Application()
 app.post("devices", ":token", "notify") { req in
@@ -100,13 +118,16 @@ try await app.start()
 
 ### Other apps
 
-Add the client to your own `ServiceGroup`:
+Create the client the same way and add it to your own `ServiceGroup` alongside your other services:
 
 ```swift
+import Logging
+import ServiceLifecycle
+
 let serviceGroup = ServiceGroup(
-    services: [server, client],
+    services: [client],
     gracefulShutdownSignals: [.sigterm],
-    logger: logger
+    logger: Logger(label: "app")
 )
 try await serviceGroup.run()
 ```
